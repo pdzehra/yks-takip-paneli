@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YKS Öğrenci Takip Paneli</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        /* Print ve Custom Scrollbar Stilleri */
+        @media print {
+            .print\:hidden { display: none !important; }
+            .print\:bg-white { background-color: white !important; }
+            .print\:text-black { color: black !important; }
+            .print\:p-0 { padding: 0 !important; }
+            .print\:shadow-none { box-shadow: none !important; }
+            .print\:rounded-none { border-radius: 0 !important; }
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Animasyonlar */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-in { animation: fadeIn 0.3s ease-in-out; }
+    </style>
+</head>
+<body class="bg-slate-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // SVG İkon Bileşenleri (Lucide-React alternatifi)
+        const Icon = ({ name, size = 24, className = "" }) => {
+            const svgRef = React.useRef();
+            useEffect(() => {
+                if (svgRef.current) {
+                    lucide.createIcons({
+                        icons: { [name]: lucide.icons[name] },
+                        nameAttr: 'data-lucide',
+                        attrs: {
+                            class: `lucide lucide-${name} ${className}`,
+                            width: size,
+                            height: size,
+                            stroke: 'currentColor',
+                            'stroke-width': 2,
+                            'stroke-linecap': 'round',
+                            'stroke-linejoin': 'round'
+                        }
+                    });
+                    const iconNode = lucide.icons[name];
+                    if(iconNode) {
+                         const svgHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}">${iconNode.reduce((acc, [tag, attrs]) => {
+                             const attrStr = Object.entries(attrs).map(([k, v]) => `${k}="${v}"`).join(' ');
+                             return acc + `<${tag} ${attrStr}></${tag}>`;
+                         }, '')}</svg>`;
+                         svgRef.current.innerHTML = svgHtml;
+                    }
+                }
+            }, [name, size, className]);
+            return <span ref={svgRef} className={`inline-flex items-center justify-center ${className}`} />;
+        };
+
+        const Plus = (props) => <Icon name="Plus" {...props} />;
+        const Trash2 = (props) => <Icon name="Trash2" {...props} />;
+        const Printer = (props) => <Icon name="Printer" {...props} />;
+        const RotateCcw = (props) => <Icon name="RotateCcw" {...props} />;
+        const CheckSquare = (props) => <Icon name="CheckSquare" {...props} />;
+        const Square = (props) => <Icon name="Square" {...props} />;
+        const AlertTriangle = (props) => <Icon name="AlertTriangle" {...props} />;
+        const Repeat = (props) => <Icon name="Repeat" {...props} />;
+        const Calendar = (props) => <Icon name="Calendar" {...props} />;
+        const Target = (props) => <Icon name="Target" {...props} />;
+        const BarChart2 = (props) => <Icon name="BarChart2" {...props} />;
+        const Play = (props) => <Icon name="Play" {...props} />;
+        const Pause = (props) => <Icon name="Pause" {...props} />;
+        const RefreshCw = (props) => <Icon name="RefreshCw" {...props} />;
+        const MapIcon = (props) => <Icon name="Map" {...props} />;
+        const ArrowRightCircle = (props) => <Icon name="ArrowRightCircle" {...props} />;
+        const Flag = (props) => <Icon name="Flag" {...props} />;
+        const BookOpen = (props) => <Icon name="BookOpen" {...props} />;
+        const TrendingUp = (props) => <Icon name="TrendingUp" {...props} />;
+        const Clock = (props) => <Icon name="Clock" {...props} />;
+        const HelpCircle = (props) => <Icon name="HelpCircle" {...props} />;
+        const X = (props) => <Icon name="X" {...props} />;
+        const Info = (props) => <Icon name="Info" {...props} />;
+        const Users = (props) => <Icon name="Users" {...props} />;
+        const ChevronLeft = (props) => <Icon name="ChevronLeft" {...props} />;
+        const Download = (props) => <Icon name="Download" {...props} />;
+        const Upload = (props) => <Icon name="Upload" {...props} />;
+
+        // --- BİLEŞENLER ---
+        const Card = ({ children, className = "" }) => (
+          <div className={`bg-white rounded-xl shadow-sm border border-slate-200 p-4 ${className}`}>
+            {children}
+          </div>
+        );
+
+        const SectionTitle = ({ icon: IconComp, title, color = "text-slate-800", rightElement = null }) => (
+          <div className={`flex items-center justify-between mb-3 pb-2 border-b border-slate-100 ${color}`}>
+            <div className="flex items-center gap-2">
+              <IconComp size={20} />
+              <h3 className="font-bold text-lg">{title}</h3>
+            </div>
+            {rightElement}
+          </div>
+        );
+
+        // --- SABİT VERİLER & VARSAYILANLAR ---
+        const yksKonulari = {
+          "TYT Türkçe": ["Sözcükte Anlam", "Söz Yorumu", "Deyim ve Atasözü", "Cümlede Anlam", "Paragraf", "Paragrafta Anlatım Teknikleri", "Paragrafta Düşünceyi Geliştirme Yolları", "Paragrafta Yapı", "Paragrafta Konu-Ana Düşünce", "Paragrafta Yardımcı Düşünce", "Ses Bilgisi", "Yazım Kuralları", "Noktalama İşaretleri", "Sözcükte Yapı/Ekler", "İsimler", "Zamirler", "Sıfatlar", "Zarflar", "Edat - Bağlaç - Ünlem", "Fiilde Anlam (Kip-Kişi-Yapı)", "Ek Fiil", "Fiilimsi", "Fiilde Çatı", "Sözcük Grupları", "Cümlenin Ögeleri", "Cümle Türleri", "Anlatım Bozukluğu"],
+          "TYT Matematik": ["Temel Kavramlar", "Sayı Basamakları", "Bölme ve Bölünebilme", "EBOB - EKOK", "Rasyonel Sayılar", "Basit Eşitsizlikler", "Mutlak Değer", "Üslü Sayılar", "Köklü Sayılar", "Çarpanlara Ayırma", "Oran Orantı", "Denklem Çözme", "Sayı Problemleri", "Kesir Problemleri", "Yaş Problemleri", "Hareket Hız Problemleri", "İşçi Emek Problemleri", "Yüzde Problemleri", "Kar Zarar Problemleri", "Karışım Problemleri", "Grafik Problemleri", "Rutin Olmayan Problemleri", "Kümeler - Kartezyen Çarpım", "Mantık", "Fonksiyonlar", "Polinomlar", "2.Dereceden Denklemler", "Permütasyon ve Kombinasyon", "Olasılık", "Veri - İstatistik"],
+          "TYT Geometri": ["Temel Kavramlar", "Doğruda Açılar", "Özel Üçgenler", "Dik Üçgen", "İkizkenar Üçgen", "Eşkenar Üçgen", "Açıortay", "Kenarortay", "Eşlik ve Benzerlik", "Üçgende Alan", "Üçgende Benzerlik", "Açı Kenar Bağıntıları", "Çokgenler", "Dörtgenler", "Deltoid", "Paralelkenar", "Eşkenar Dörtgen", "Dikdörtgen", "Kare", "Yamuk", "Çemberde Açı", "Çemberde Uzunluk", "Dairede Çevre ve Alan", "Noktanın Analitiği", "Doğrunun Analitiği", "Dönüşüm Geometrisi", "Prizmalar", "Küp", "Silindir", "Piramit", "Koni", "Küre", "Çemberin Analitiği"],
+          "TYT Fizik": ["Fizik Bilimine Giriş", "Madde ve Özellikleri", "Sıvıların Kaldırma Kuvveti", "Basınç", "Isı, Sıcaklık ve Genleşme", "Hareket ve Kuvvet", "Dinamik", "İş, Güç ve Enerji", "Elektrik", "Manyetizma", "Dalgalar", "Optik"],
+          "TYT Kimya": ["Kimya Bilimi", "Atom ve Periyodik Sistem", "Kimyasal Türler Arası Etkileşimler", "Maddenin Halleri", "Doğa ve Kimya", "Kimyanın Temel Kanunları", "Kimyasal Hesaplamalar", "Karışımlar", "Asit, Baz ve Tuz", "Kimya Her Yerde"],
+          "TYT Biyoloji": ["Canlıların Ortak Özellikleri", "Canlıların Temel Bileşenleri", "Hücre ve Organelleri", "Hücre Zarından Madde Geçişi", "Canlıların Sınıflandırılması", "Mitoz ve Eşeysiz Üreme", "Mayoz ve Eşeyli Üreme", "Kalıtım", "Ekosistem Ekolojisi", "Güncel Çevre Sorunları"],
+          "TYT Tarih": ["Tarih ve Zaman", "İnsanlığın İlk Dönemleri", "Orta Çağ'da Dünya", "İlk ve Orta Çağlarda Türk Dünyası", "İslam Medeniyetinin Doğuşu", "Türklerin İslamiyet'i Kabulü ve İlk Türk İslam Devletleri", "Yerleşme ve Devletleşme Sürecinde Selçuklu Türkiyesi", "Beylikten Devlete Osmanlı Siyaseti", "Devletleşme Sürecinde Savaşçılar ve Askerler", "Beylikten Devlete Osmanlı Medeniyeti", "Dünya Gücü Osmanlı", "Sultan ve Osmanlı Merkez Teşkilatı", "Klasik Çağda Osmanlı Toplum Düzeni", "Değişen Dünya Dengeleri Karşısında Osmanlı Siyaseti", "Değişim Çağında Avrupa ve Osmanlı", "Uluslararası İlişkilerde Denge Stratejisi (1774-1914)", "Devrimler Çağında Değişen Devlet-Toplum İlişkileri", "Sermaye ve Emek", "XIX. ve XX. Yüzyılda Değişen Gündelik Hayat", "XX. Yüzyıl Başlarında Osmanlı Devleti ve Dünya", "Milli Mücadele", "Atatürkçülük ve Türk İnkılabı"],
+          "TYT Coğrafya": ["Doğa ve İnsan", "Dünya'nın Şekli ve Hareketleri", "Coğrafi Konum", "Harita Bilgisi", "Atmosfer ve Sıcaklık", "İklimler", "Basınç ve Rüzgarlar", "Nem, Yağış ve Buharlaşma", "İç Kuvvetler / Dış Kuvvetler", "Su - Toprak ve Bitkiler", "Nüfus", "Göç", "Yerleşme", "Türkiye'nin Yer Şekilleri", "Ekonomik Faaliyetler", "Bölgeler", "Uluslararası Ulaşım Hatları", "Çevre ve Toplum", "Doğal Afetler"],
+          "TYT Felsefe": ["Felsefe'nin Konusu", "Bilgi Felsefesi", "Varlık Felsefesi", "Ahlak Felsefesi", "Sanat Felsefesi", "Din Felsefesi", "Siyaset Felsefesi", "Bilim Felsefesi", "İlk Çağ Felsefesi", "2. Yüzyıl ve 15. Yüzyıl Felsefeleri", "15. Yüzyıl ve 17. Yüzyıl Felsefeleri", "18. Yüzyıl ve 19. Yüzyıl Felsefeleri", "20. Yüzyıl Felsefesi"],
+          "TYT Din Kültürü": ["Bilgi ve İnanç", "İslam ve İbadet", "Ahlak ve Değerler", "Allah İnsan İlişkisi", "Hz. Muhammed (S.A.V.)", "Vahiy ve Akıl", "İslam Düşüncesinde Yorumlar, Mezhepler", "Din, Kültür ve Medeniyet", "İslam ve Bilim, Estetik, Barış", "Yaşayan Dinler"],
+          "AYT Matematik": ["Kümeler", "Denklem ve Eşitsizlikler", "Üslü ve Köklü İfadeler", "Fonksiyonlar", "Veri ve Olasılık", "Sayma", "Polinomlar", "İkinci Dereceden Denklemler", "Fonksiyonlarda Uygulamalar", "Denklem ve Eşitsizlik Sistemleri", "Üstel ve Logaritmik Fonksiyonlar", "Diziler", "Trigonometri", "Limit ve Süreklilik", "Türev", "İntegral"],
+          "AYT Geometri": ["Üçgenlerde Eşlik ve Benzerlik", "Üçgenin Yardımcı Elemanları", "Dik Üçgen ve Trigonometri", "Üçgenin Alanı", "Dörtgenler ve Çokgenler", "Katı Cisimler", "Analitik Geometri", "Çember ve Daire", "Dönüşümler", "Çemberin Analitik İncelenmesi"],
+          "AYT Edebiyat": ["Güzel Sanatlar ve Edebiyat", "Metinlerin Sınıflandırılması", "Şiir Bilgisi", "Edebi Sanatlar", "Türk Edebiyatı Dönemleri", "İslamiyet Öncesi Türk Edebiyatı", "Halk Edebiyatı", "Divan Edebiyatı", "Tanzimat Edebiyatı", "Servet-i Fünun Edebiyatı", "Fecr-i Ati Edebiyatı", "Milli Edebiyat", "Cumhuriyet Dönemi Türk Edebiyatı", "Edebi Akımlar", "Dünya Edebiyatı"],
+          "AYT Tarih": ["Tarih Bilimi", "Uygarlığın Doğuşu", "İlk Türk Devletleri", "İslam Tarihi", "Türk-İslam Devletleri", "Türkiye Tarihi", "Beylikten Devlete Osmanlı", "Dünya Gücü Osmanlı", "Arayış Yılları", "En Uzun Yüzyıl", "20. Yüzyıl Başlarında Osmanlı", "Milli Mücadele", "Atatürkçülük ve İnkılaplar", "İki Savaş Arasındaki Dönem", "II. Dünya Savaşı", "Soğuk Savaş", "Yumuşama Dönemi", "Küreselleşen Dünya"],
+          "AYT Coğrafya": ["Ekosistem", "Beşeri Sistemler", "Mekansal Bir Sentez: Türkiye", "Küresel Ortam: Bölgeler ve Ülkeler", "Çevre ve Toplum", "Ekonomik Faaliyetler"],
+          "AYT Fizik": ["Vektörler", "Bağıl Hareket", "Newton'ın Hareket Yasaları", "Sabit İvmeli Hareket", "Enerji ve Hareket", "İtme ve Çizgisel Momentum", "Tork ve Denge", "Basit Makineler", "Elektriksel Kuvvet ve Alan", "Manyetizma", "Alternatif Akım", "Çembersel Hareket", "Açısal Momentum", "Kütle Çekimi ve Kepler", "Basit Harmonik Hareket", "Dalga Mekaniği", "Atom Fiziği", "Modern Fizik"],
+          "AYT Kimya": ["Modern Atom Teorisi", "Gazlar", "Sıvı Çözeltiler", "Kimyasal Tepkimelerde Enerji", "Kimyasal Tepkimelerde Hız", "Kimyasal Tepkimelerde Denge", "Asit-Baz Dengesi", "Çözünürlük Dengesi", "Kimya ve Elektrik", "Karbon Kimyasına Giriş", "Organik Bileşikler"],
+          "AYT Biyoloji": ["İnsan Fizyolojisi", "Sinir Sistemi", "Duyu Organları", "Destek ve Hareket Sistemi", "Sindirim Sistemi", "Dolaşım Sistemi", "Solunum Sistemi", "Üriner Sistem", "Üreme Sistemi", "Komünite ve Popülasyon Ekolojisi", "Nükleik Asitler", "Protein Sentezi", "Enerji Dönüşümleri", "Bitki Biyolojisi", "Canlılar ve Çevre"],
+          "AYT Felsefe Grubu": ["Felsefenin Alanı", "Mantığa Giriş", "Klasik Mantık", "Mantık ve Dil", "Psikoloji Bilimini Tanıyalım", "Psikolojinin Temel Süreçleri", "Öğrenme-Bellek", "Ruh Sağlığı", "Sosyolojiye Giriş", "Birey ve Toplum", "Toplumsal Yapı", "Toplumsal Değişme", "Toplum ve Kültür", "Toplumsal Kurumlar"],
+          "YDT İngilizce": ["Grammar", "Vocabulary", "Reading Comprehension", "Cloze Test", "Sentence Completion", "Translation", "Dialogue Completion", "Restatement", "Paragraph Completion", "Irrelevant Sentence"]
+        };
+
+        let idCounter = 1;
+        const defaultSubjectsList = [];
+        Object.entries(yksKonulari).forEach(([category, topics]) => {
+          topics.forEach(topic => {
+            defaultSubjectsList.push({ id: idCounter++, category, name: topic, status: 'pending' });
+          });
+        });
+
+        const getNewStudentData = (name) => ({
+          id: Date.now().toString(),
+          name: name,
+          week: '',
+          macroGoals: { tytDate: '', aytDate: '' },
+          subjects: defaultSubjectsList,
+          resources: [],
+          netScores: [],
+          studyHours: [],
+          mistakes: [],
+          revisions: [],
+          dailyPlan: { 'Pazartesi': [], 'Salı': [], 'Çarşamba': [], 'Perşembe': [], 'Cuma': [], 'Cumartesi': [], 'Pazar': [] },
+          dailyQuestionCount: 0,
+          todayStudyHour: 0,
+        });
+
+        // ==========================================
+        // ANA BİLEŞEN (EĞİTMEN PANELİ YÖNETİMİ)
+        // ==========================================
+        function App() {
+          // VERİ KAYBI SORUNU BURADA ÇÖZÜLDÜ: Lazy Initialization
+          const [students, setStudents] = useState(() => {
+            const savedCoachData = localStorage.getItem('yks_panel_v1');
+            if (savedCoachData) {
+              return JSON.parse(savedCoachData);
+            }
+            // Eski anahtar kontrolü (Geriye dönük uyumluluk)
+            const oldKey = 'rehberlik_coach_v1';
+            const oldData = localStorage.getItem(oldKey);
+            if (oldData) {
+              return JSON.parse(oldData);
+            }
+            return [];
+          });
+          
+          const [activeStudentId, setActiveStudentId] = useState(null);
+
+          // Her değişiklikte doğrudan kaydet
+          useEffect(() => {
+            localStorage.setItem('yks_panel_v1', JSON.stringify(students));
+          }, [students]);
+
+          const handleUpdateStudent = (updatedStudent) => {
+            setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s));
+          };
+
+          const handleAddStudent = (name) => {
+            if (!name.trim()) return;
+            const newStudent = getNewStudentData(name);
+            setStudents([...students, newStudent]);
+          };
+
+          const handleDeleteStudent = (id) => {
+            if (window.confirm("Bu öğrencinin tüm verileri silinecek. Emin misiniz?")) {
+              setStudents(prev => prev.filter(s => s.id !== id));
+            }
+          };
+
+          const handleImportData = (importedData) => {
+            if (window.confirm("Mevcut verileriniz tamamen silinip yerine yüklediğiniz dosyadaki veriler getirilecek. Emin misiniz?")) {
+              setStudents(importedData);
+              alert("Veriler başarıyla yüklendi!");
+            }
+          };
+
+          // AKTİF ÖĞRENCİ GÖRÜNÜMÜ
+          if (activeStudentId) {
+            const activeStudent = students.find(s => s.id === activeStudentId);
+            if (!activeStudent) {
+              setActiveStudentId(null);
+              return null;
+            }
+            return (
+              <StudentDetail 
+                key={activeStudent.id} 
+                student={activeStudent} 
+                onUpdate={handleUpdateStudent} 
+                onBack={() => setActiveStudentId(null)} 
+              />
+            );
+          }
+
+          // KOÇLUK PANELİ (DASHBOARD) GÖRÜNÜMÜ
+          return <CoachDashboard 
+                   students={students} 
+                   onAdd={handleAddStudent} 
+                   onDelete={handleDeleteStudent} 
+                   onSelect={setActiveStudentId} 
+                   onImport={handleImportData}
+                 />;
+        }
+
+        // ==========================================
+        // BİLEŞEN 1: KOÇLUK EKRANI (DASHBOARD)
+        // ==========================================
+        function CoachDashboard({ students, onAdd, onDelete, onSelect, onImport }) {
+          const [newName, setNewName] = useState('');
+          const fileInputRef = React.useRef(null);
+
+          const handleExport = () => {
+            const dataStr = JSON.stringify(students);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            const exportFileDefaultName = `yks_takip_yedek_${new Date().toISOString().slice(0,10)}.json`;
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+          };
+
+          const handleFileChange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              try {
+                const parsed = JSON.parse(event.target.result);
+                if (Array.isArray(parsed)) {
+                  onImport(parsed);
+                } else {
+                  alert("Geçersiz yedek dosyası!");
+                }
+              } catch (err) {
+                alert("Dosya okuma hatası! Lütfen geçerli bir yedek dosyası seçin.");
+              }
+            };
+            reader.readAsText(file);
+            e.target.value = ''; // Input'u temizle
+          };
+
+          return (
+            <div className="min-h-screen bg-slate-50 p-6 md:p-12 font-sans text-slate-800">
+              <div className="max-w-7xl mx-auto">
+                
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-indigo-600 p-3 rounded-xl shadow-lg shadow-indigo-200 text-white">
+                      <Users size={32} />
+                    </div>
+                    <div>
+                      <h1 className="text-3xl font-extrabold text-indigo-900">YKS Öğrenci Takip Paneli</h1>
+                      <p className="text-slate-500">Öğrencilerinin tüm ilerlemelerini tek ekrandan yönet.</p>
+                    </div>
+                  </div>
+                  
+                  {/* YEDEKLEME BUTONLARI */}
+                  <div className="flex gap-2 w-full md:w-auto">
+                    <input type="file" accept=".json" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
+                    <button onClick={() => fileInputRef.current.click()} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-lg font-bold hover:bg-slate-50 transition-colors shadow-sm text-sm">
+                      <Upload size={16} /> Yedeği Yükle
+                    </button>
+                    <button onClick={handleExport} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-700 px-4 py-2 rounded-lg font-bold hover:bg-indigo-100 transition-colors shadow-sm text-sm">
+                      <Download size={16} /> Yedekle (İndir)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Öğrenci Ekleme Formu */}
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex gap-3 mb-8">
+                  <input 
+                    value={newName} 
+                    onChange={(e) => setNewName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { onAdd(newName); setNewName(''); } }}
+                    placeholder="Yeni Öğrenci Adı Soyadı..." 
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 outline-none focus:border-indigo-400 focus:bg-white transition-colors"
+                  />
+                  <button 
+                    onClick={() => { onAdd(newName); setNewName(''); }}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors shadow-sm"
+                  >
+                    <Plus size={18} /> Öğrenci Ekle
+                  </button>
+                </div>
+
+                {/* Öğrenci Listesi Grid */}
+                {students.length === 0 ? (
+                  <div className="text-center py-20 bg-white rounded-xl border border-slate-200 border-dashed">
+                    <Users size={48} className="mx-auto text-slate-300 mb-4" />
+                    <h3 className="text-xl font-bold text-slate-600 mb-2">Henüz Öğrenci Yok</h3>
+                    <p className="text-slate-500">Yukarıdaki alanı kullanarak takip edeceğiniz öğrencileri ekleyebilirsiniz.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {students.map(student => {
+                      // Özet Veri Hesaplamaları
+                      const lastTyt = student.netScores.filter(n => n.type === 'TYT').slice(-1)[0]?.score || '-';
+                      const lastAyt = student.netScores.filter(n => n.type === 'AYT').slice(-1)[0]?.score || '-';
+                      const finishedSubjects = student.subjects.filter(s => s.status === 'done').length;
+                      
+                      return (
+                        <div key={student.id} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 hover:shadow-md transition-shadow relative group">
+                          <div className="flex justify-between items-start mb-4">
+                            <h3 className="text-xl font-bold text-slate-800">{student.name}</h3>
+                            <button 
+                              onClick={() => onDelete(student.id)} 
+                              className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Öğrenciyi Sil"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4 mb-6">
+                            <div className="bg-blue-50 p-3 rounded-xl border border-blue-100">
+                              <div className="text-xs font-bold text-blue-500 mb-1">SON TYT</div>
+                              <div className="text-2xl font-black text-blue-700">{lastTyt}</div>
+                            </div>
+                            <div className="bg-red-50 p-3 rounded-xl border border-red-100">
+                              <div className="text-xs font-bold text-red-500 mb-1">SON AYT</div>
+                              <div className="text-2xl font-black text-red-700">{lastAyt}</div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                            <CheckSquare size={16} className="text-green-500" />
+                            <span>Toplam <strong>{finishedSubjects}</strong> konu bitirildi.</span>
+                          </div>
+
+                          <button 
+                            onClick={() => onSelect(student.id)} 
+                            className="w-full bg-slate-900 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"
+                          >
+                            Öğrenci Profilini Aç <ArrowRightCircle size={18} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Öğrenci Karşılaştırma Tablosu */}
+                {students.length > 0 && (
+                  <div className="mt-12 bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                    <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                      <BarChart2 size={24} className="text-indigo-600" /> Öğrenci Karşılaştırma Tablosu
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-left">
+                        <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+                          <tr>
+                            <th className="px-6 py-4 font-bold">Öğrenci</th>
+                            <th className="px-6 py-4 font-bold">Son TYT</th>
+                            <th className="px-6 py-4 font-bold">Son AYT</th>
+                            <th className="px-6 py-4 font-bold">Biten Konu</th>
+                            <th className="px-6 py-4 font-bold">Günlük Soru Hedefi</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {students.map(s => {
+                            const lastTyt = s.netScores.filter(n => n.type === 'TYT').slice(-1)[0]?.score || '-';
+                            const lastAyt = s.netScores.filter(n => n.type === 'AYT').slice(-1)[0]?.score || '-';
+                            const finishedSubjects = s.subjects.filter(sub => sub.status === 'done').length;
+                            return (
+                              <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-6 py-4 font-bold text-slate-700">{s.name}</td>
+                                <td className="px-6 py-4"><span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-md font-bold">{lastTyt}</span></td>
+                                <td className="px-6 py-4"><span className="bg-red-100 text-red-700 px-2 py-1 rounded-md font-bold">{lastAyt}</span></td>
+                                <td className="px-6 py-4 text-green-600 font-medium">{finishedSubjects} Konu</td>
+                                <td className="px-6 py-4 text-indigo-600 font-medium">{s.dailyQuestionCount} Soru</td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </div>
+          );
+        }
+
+        // ==========================================
+        // BİLEŞEN 2: ÖĞRENCİ DETAYI
+        // ==========================================
+        function StudentDetail({ student, onUpdate, onBack }) {
+          const [activeTab, setActiveTab] = useState('weekly'); 
+          
+          const [name, setName] = useState(student.name);
+          const [week, setWeek] = useState(student.week);
+          const [macroGoals, setMacroGoals] = useState(student.macroGoals);
+          const [resources, setResources] = useState(student.resources);
+          const [netScores, setNetScores] = useState(student.netScores);
+          const [studyHours, setStudyHours] = useState(student.studyHours);
+          const [subjects, setSubjects] = useState(student.subjects);
+          const [mistakes, setMistakes] = useState(student.mistakes);
+          const [revisions, setRevisions] = useState(student.revisions);
+          const [dailyPlan, setDailyPlan] = useState(student.dailyPlan);
+          const [dailyQuestionCount, setDailyQuestionCount] = useState(student.dailyQuestionCount);
+          const [todayStudyHour, setTodayStudyHour] = useState(student.todayStudyHour); 
+
+          // UI İçin Geçici State'ler
+          const [resInput, setResInput] = useState({ name: '', subject: 'Matematik', month: '', status: 'not-started' });
+          const [netInput, setNetInput] = useState({ type: 'TYT', score: '', date: '' });
+          const [netEntryMode, setNetEntryMode] = useState('overall');
+          const [detailedNetInput, setDetailedNetInput] = useState({ tyt: { turkce: '', mat: '', sosyal: '', fen: '' }, ayt: { edebiyat: '', mat: '', sos1: '', sos2: '', fen: '' } });
+          const [newSubject, setNewSubject] = useState('');
+          const [newSubjectCat, setNewSubjectCat] = useState('TYT Türkçe');
+          
+          const [mistakeCat, setMistakeCat] = useState('TYT Türkçe');
+          const [mistakeTopic, setMistakeTopic] = useState('');
+          const [mistakeReason, setMistakeReason] = useState('Bilgi Eksikliği');
+          
+          const [revisionInput, setRevisionInput] = useState('');
+          const [activeTaskDay, setActiveTaskDay] = useState(null);
+          
+          const [taskCat, setTaskCat] = useState('TYT Türkçe');
+          const [taskTopic, setTaskTopic] = useState('');
+          const [taskDesc, setTaskDesc] = useState('');
+          
+          const [showAllNets, setShowAllNets] = useState(false); 
+          const [chartType, setChartType] = useState('bar'); // 'bar' | 'line'
+
+          const [subjectTypeFilter, setSubjectTypeFilter] = useState('TYT'); // YENİ: TYT/AYT/YDT filtresi
+          
+          const [pomodoroTime, setPomodoroTime] = useState(25 * 60);
+          const [isTimerActive, setIsTimerActive] = useState(false);
+          const [timerMode, setTimerMode] = useState('work');
+          const days = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+
+          useEffect(() => {
+            onUpdate({
+              id: student.id,
+              name, week, mistakes, revisions, dailyPlan, dailyQuestionCount, todayStudyHour, macroGoals, subjects, resources, netScores, studyHours
+            });
+          }, [name, week, mistakes, revisions, dailyPlan, dailyQuestionCount, todayStudyHour, macroGoals, subjects, resources, netScores, studyHours]);
+
+          useEffect(() => {
+            let interval = null;
+            if (isTimerActive && pomodoroTime > 0) {
+              interval = setInterval(() => { setPomodoroTime(pomodoroTime - 1); }, 1000);
+            } else if (pomodoroTime === 0) {
+              setIsTimerActive(false);
+            }
+            return () => clearInterval(interval);
+          }, [isTimerActive, pomodoroTime]);
+
+          const formatTime = (seconds) => {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+          };
+
+          const toggleTimer = () => setIsTimerActive(!isTimerActive);
+          const resetTimer = () => { setIsTimerActive(false); setPomodoroTime(timerMode === 'work' ? 25 * 60 : 5 * 60); };
+          const switchTimerMode = () => {
+            const newMode = timerMode === 'work' ? 'break' : 'work';
+            setTimerMode(newMode);
+            setPomodoroTime(newMode === 'work' ? 25 * 60 : 5 * 60);
+            setIsTimerActive(false);
+          };
+
+          const categories = ['Genel', ...new Set([...Object.keys(yksKonulari), ...subjects.map(s => s.category)])];
+
+          const addResource = () => {
+            if (!resInput.name) return;
+            setResources([...resources, { ...resInput, id: Date.now() }]);
+            setResInput({ ...resInput, name: '' });
+          };
+          const updateResourceStatus = (id, status) => setResources(resources.map(r => r.id === id ? { ...r, status } : r));
+          const deleteResource = (id) => setResources(resources.filter(r => r.id !== id));
+
+          const addNetScore = () => {
+            const entryDate = netInput.date || new Date().toISOString().split('T')[0];
+            let newEntry = { id: Date.now(), type: netInput.type, date: entryDate, isDetailed: netEntryMode === 'detailed' };
+            if (netEntryMode === 'overall') {
+              if (!netInput.score) {
+                alert("Lütfen net değerini giriniz.");
+                return;
+              }
+              newEntry.score = parseFloat(netInput.score);
+            } else {
+              const details = netInput.type === 'TYT' ? detailedNetInput.tyt : detailedNetInput.ayt;
+              const total = Object.values(details).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+              if (total === 0 && !Object.values(details).some(v => v !== '')) {
+                alert("Lütfen detaylı netleri giriniz.");
+                return;
+              }
+              newEntry.score = total;
+              newEntry.details = { 
+                turkce: parseFloat(details.turkce) || 0, mat: parseFloat(details.mat) || 0, sosyal: parseFloat(details.sosyal) || 0, fen: parseFloat(details.fen) || 0,
+                edebiyat: parseFloat(details.edebiyat) || 0, sos1: parseFloat(details.sos1) || 0, sos2: parseFloat(details.sos2) || 0
+              };
+            }
+            setNetScores([...netScores, newEntry].sort((a,b) => new Date(a.date) - new Date(b.date)));
+            setNetInput({ ...netInput, score: '' });
+            setDetailedNetInput({ tyt: { turkce: '', mat: '', sosyal: '', fen: '' }, ayt: { edebiyat: '', mat: '', sos1: '', sos2: '', fen: '' } });
+          };
+          const deleteNetScore = (id) => setNetScores(netScores.filter(n => n.id !== id));
+
+          const saveStudyHour = () => {
+            if(todayStudyHour <= 0) return;
+            const today = new Date().toISOString().split('T')[0];
+            const existingIndex = studyHours.findIndex(s => s.date === today);
+            if (existingIndex >= 0) {
+              const updated = [...studyHours];
+              updated[existingIndex].hours = todayStudyHour;
+              setStudyHours(updated);
+            } else {
+              setStudyHours([...studyHours, { date: today, hours: todayStudyHour }].slice(-7)); 
+            }
+            alert("Bugünkü çalışma saati kaydedildi.");
+          };
+
+          const addSubject = () => {
+            if (!newSubject.trim()) return;
+            setSubjects([...subjects, { id: Date.now(), category: newSubjectCat, name: newSubject, status: 'pending' }]);
+            setNewSubject('');
+          };
+          const updateSubjectStatus = (id, newStatus) => setSubjects(subjects.map(s => s.id === id ? { ...s, status: newStatus } : s));
+          const removeSubject = (id) => setSubjects(subjects.filter(s => s.id !== id));
+
+          const addMistake = () => {
+            if (!mistakeTopic.trim()) return;
+            setMistakes([...mistakes, { id: Date.now(), category: mistakeCat, topic: mistakeTopic, reason: mistakeReason }]);
+            setMistakeTopic('');
+          };
+          const removeMistake = (id) => setMistakes(mistakes.filter(m => m.id !== id));
+          const moveMistakeToRevision = (mistake) => {
+            const catText = mistake.category && mistake.category !== 'Genel' ? `[${mistake.category}] ` : '';
+            setRevisions([...revisions, { id: Date.now(), text: `${catText}${mistake.topic} (${mistake.reason}) - Telafi Testi`, done: false }]);
+            alert(`${mistake.topic} tekrar listesine eklendi.`);
+          };
+
+          const addRevision = () => {
+            if (!revisionInput.trim()) return;
+            setRevisions([...revisions, { id: Date.now(), text: revisionInput, done: false }]);
+            setRevisionInput('');
+          };
+          const removeRevision = (id) => setRevisions(revisions.filter(r => r.id !== id));
+
+          const addDailyTask = (day, text) => {
+            if (!text.trim()) return;
+            setDailyPlan(prev => ({ ...prev, [day]: [...(prev[day] || []), { id: Date.now(), text, done: false }] }));
+          };
+          const submitDailyTask = (day) => {
+            let finalTaskText = '';
+            const catPrefix = taskCat !== 'Genel' ? `${taskCat} - ` : '';
+            if (taskTopic && taskDesc) finalTaskText = `${catPrefix}${taskTopic} (${taskDesc})`;
+            else if (taskTopic) finalTaskText = `${catPrefix}${taskTopic}`;
+            else if (taskDesc) finalTaskText = taskDesc; 
+            else return;
+            addDailyTask(day, finalTaskText);
+            setTaskTopic(''); setTaskDesc(''); setActiveTaskDay(null);
+          };
+          const toggleDailyTask = (day, id) => setDailyPlan(prev => ({ ...prev, [day]: prev[day].map(t => t.id === id ? { ...t, done: !t.done } : t) }));
+          const removeDailyTask = (day, id) => setDailyPlan(prev => ({ ...prev, [day]: prev[day].filter(t => t.id !== id) }));
+          
+          const resetSubjectsToDefault = () => {
+            if(window.confirm("Konu durumları silinecek ve tüm TYT/AYT/YDT konuları varsayılan olarak yüklenecektir. Emin misiniz?")) {
+              setSubjects(defaultSubjectsList);
+            }
+          };
+
+          const getStatusColor = (status) => {
+            switch(status) {
+              case 'done': return 'bg-green-100 text-green-700 border-green-200';
+              case 'working': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+              case 'review': return 'bg-red-100 text-red-700 border-red-200';
+              default: return 'bg-slate-50 text-slate-500 border-slate-200';
+            }
+          };
+
+          const chartData = showAllNets ? netScores : netScores.slice(-5);
+
+          return (
+            <div className="min-h-screen bg-slate-50 font-sans text-slate-800 p-4 md:p-8 print:p-0 print:bg-white animate-in">
+              
+              {/* ÜST BAR */}
+              <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center mb-6 gap-4 print:hidden">
+                <div className="flex items-center gap-4">
+                  <button onClick={onBack} className="bg-white border border-slate-200 text-slate-600 p-2 rounded-xl shadow-sm hover:bg-slate-100 hover:text-indigo-600 transition-all">
+                    <ChevronLeft size={24} />
+                  </button>
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <h1 className="text-2xl font-bold text-indigo-900">Öğrenci Dosyası</h1>
+                    </div>
+                    <p className="text-sm text-slate-500">Düzenlenen: <strong>{name}</strong></p>
+                  </div>
+                </div>
+                
+                <div className="flex gap-2">
+                  <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-md transition-colors font-bold">
+                    <Printer size={18} /> Raporu Yazdır
+                  </button>
+                </div>
+              </div>
+
+              <div className="max-w-7xl mx-auto bg-white shadow-xl rounded-2xl overflow-hidden print:shadow-none print:rounded-none border border-slate-100">
+                
+                {/* BAŞLIK VE HEDEF TARİHLERİ */}
+                <div className="bg-indigo-900 text-white p-6 print:bg-white print:text-black print:border-b-2 print:border-black">
+                  <div className="flex flex-col md:flex-row gap-6 mb-6">
+                    <div className="flex-1">
+                      <label className="block text-xs uppercase opacity-70 mb-1">Öğrenci Adı</label>
+                      <input 
+                        value={name}
+                        onChange={e => setName(e.target.value)}
+                        placeholder="Adınızı girin..." 
+                        className="w-full bg-transparent text-2xl font-bold placeholder-indigo-300/50 outline-none border-b border-indigo-700 focus:border-white transition-colors print:placeholder-transparent"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-xs uppercase opacity-70 mb-1">Hafta / Hedef Tarih</label>
+                      <input 
+                        value={week}
+                        onChange={e => setWeek(e.target.value)}
+                        placeholder="Örn: 1-7 Ocak" 
+                        className="w-full bg-transparent text-2xl font-bold placeholder-indigo-300/50 outline-none border-b border-indigo-700 focus:border-white transition-colors print:placeholder-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-indigo-800/50 p-4 rounded-lg border border-indigo-700 print:bg-white print:border-slate-300 print:text-black">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1 text-indigo-200 text-xs font-bold uppercase print:text-slate-500">
+                        <Flag size={14} /> TYT Bitiş Hedefi
+                      </div>
+                      <input type="month" className="bg-transparent text-white font-mono text-lg w-full outline-none placeholder-indigo-400 print:text-black" value={macroGoals.tytDate} onChange={e => setMacroGoals({...macroGoals, tytDate: e.target.value})} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1 text-indigo-200 text-xs font-bold uppercase print:text-slate-500">
+                        <Flag size={14} /> AYT Bitiş Hedefi
+                      </div>
+                      <input type="month" className="bg-transparent text-white font-mono text-lg w-full outline-none placeholder-indigo-400 print:text-black" value={macroGoals.aytDate} onChange={e => setMacroGoals({...macroGoals, aytDate: e.target.value})} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* TAB MENÜSÜ */}
+                <div className="flex border-b border-slate-200 overflow-x-auto print:hidden">
+                  <button onClick={() => setActiveTab('weekly')} className={`flex-1 min-w-[150px] p-4 font-bold text-sm flex items-center justify-center gap-2 transition-colors ${activeTab === 'weekly' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50' : 'text-slate-500 hover:bg-slate-50'}`}>
+                    <Calendar size={16} /> HAFTALIK PLAN
+                  </button>
+                  <button onClick={() => setActiveTab('subjects')} className={`flex-1 min-w-[150px] p-4 font-bold text-sm flex items-center justify-center gap-2 transition-colors ${activeTab === 'subjects' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50' : 'text-slate-500 hover:bg-slate-50'}`}>
+                    <MapIcon size={16} /> KONU TAKİP
+                  </button>
+                  <button onClick={() => setActiveTab('resources')} className={`flex-1 min-w-[150px] p-4 font-bold text-sm flex items-center justify-center gap-2 transition-colors ${activeTab === 'resources' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50' : 'text-slate-500 hover:bg-slate-50'}`}>
+                    <BookOpen size={16} /> KAYNAK PLANI
+                  </button>
+                  <button onClick={() => setActiveTab('progress')} className={`flex-1 min-w-[150px] p-4 font-bold text-sm flex items-center justify-center gap-2 transition-colors ${activeTab === 'progress' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50' : 'text-slate-500 hover:bg-slate-50'}`}>
+                    <TrendingUp size={16} /> NET & GELİŞİM
+                  </button>
+                </div>
+
+                {/* İÇERİK ALANI */}
+                <div className="p-6">
+                  
+                  {/* TAB 1: HAFTALIK PLAN */}
+                  {activeTab === 'weekly' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in">
+                      <div className="lg:col-span-4 space-y-6">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className={`col-span-2 p-3 rounded-xl border ${timerMode === 'work' ? 'bg-indigo-50 border-indigo-200' : 'bg-green-50 border-green-200'} flex items-center justify-between`}>
+                            <div>
+                              <div className="text-xs font-bold opacity-70 mb-1">POMODORO</div>
+                              <div className="text-2xl font-mono font-bold">{formatTime(pomodoroTime)}</div>
+                            </div>
+                            <div className="flex gap-1">
+                              <button onClick={toggleTimer} className="p-2 bg-white rounded-full shadow hover:bg-slate-50">{isTimerActive ? <Pause size={16}/> : <Play size={16}/>}</button>
+                              <button onClick={resetTimer} className="p-2 bg-white rounded-full shadow hover:bg-slate-50"><RefreshCw size={16}/></button>
+                              <button onClick={switchTimerMode} className="p-2 bg-white rounded-full shadow text-[10px] font-bold hover:bg-slate-50">{timerMode === 'work' ? 'Mola' : 'İş'}</button>
+                            </div>
+                          </div>
+                          
+                          <div className="p-3 rounded-xl border border-slate-200 bg-white flex flex-col items-center justify-center">
+                            <div className="text-2xl font-bold text-indigo-900">{dailyQuestionCount}</div>
+                            <div className="text-[10px] text-slate-400 font-bold tracking-wider">GÜNLÜK SORU</div>
+                            <div className="flex gap-2 mt-1">
+                              <button onClick={() => setDailyQuestionCount(c => Math.max(0, c - 10))} className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center hover:bg-slate-200">-</button>
+                              <button onClick={() => setDailyQuestionCount(c => c + 10)} className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 hover:bg-indigo-200">+</button>
+                            </div>
+                          </div>
+
+                          <div className="p-3 rounded-xl border border-slate-200 bg-white flex flex-col items-center justify-center">
+                            <div className="text-2xl font-bold text-indigo-900">{todayStudyHour} <span className="text-xs font-normal text-slate-400">sa</span></div>
+                            <div className="text-[10px] text-slate-400 font-bold tracking-wider">BUGÜN ÇALIŞMA</div>
+                            <div className="flex gap-2 mt-1">
+                              <button onClick={() => setTodayStudyHour(h => Math.max(0, h - 0.5))} className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center hover:bg-slate-200">-</button>
+                              <button onClick={() => setTodayStudyHour(h => h + 0.5)} className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 hover:bg-indigo-200">+</button>
+                            </div>
+                            <button onClick={saveStudyHour} className="mt-2 text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-100 w-full font-bold">Grafiğe Kaydet</button>
+                          </div>
+                        </div>
+
+                        <Card className="border-l-4 border-l-red-500">
+                          <SectionTitle icon={AlertTriangle} title="Hata Analizi" color="text-red-700" />
+                          <div className="flex flex-col gap-2 mb-4 print:hidden">
+                            <select className="bg-slate-50 text-sm border border-slate-200 rounded p-2 outline-none focus:border-red-400 font-bold text-slate-700" 
+                              value={mistakeCat} onChange={e => { setMistakeCat(e.target.value); setMistakeTopic(''); }}>
+                              {categories.map(c => <option key={c}>{c}</option>)}
+                            </select>
+                            
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <select 
+                                className="w-full sm:w-1/2 bg-slate-50 text-sm border border-slate-200 rounded p-2 outline-none focus:border-red-400"
+                                value=""
+                                onChange={e => { if(e.target.value) setMistakeTopic(e.target.value); }}
+                              >
+                                <option value="">Listeden Seç...</option>
+                                {subjects.filter(s => s.category === mistakeCat).map(s => (
+                                   <option key={s.id} value={s.name}>{s.name}</option>
+                                ))}
+                              </select>
+                              <input className="w-full sm:w-1/2 bg-slate-50 text-sm border border-slate-200 rounded p-2 outline-none focus:border-red-400" 
+                                placeholder="veya elle yaz..." value={mistakeTopic} onChange={e => setMistakeTopic(e.target.value)} 
+                              />
+                            </div>
+                            
+                            <div className="flex gap-2">
+                              <select className="flex-1 bg-slate-50 text-sm border border-slate-200 rounded p-2 outline-none" value={mistakeReason} onChange={e => setMistakeReason(e.target.value)}>
+                                <option>Bilgi Eksikliği</option>
+                                <option>Dikkat</option>
+                                <option>Süre</option>
+                                <option>İşlem</option>
+                              </select>
+                              <button onClick={addMistake} className="bg-red-600 text-white p-2 rounded hover:bg-red-700 transition-colors"><Plus size={18}/></button>
+                            </div>
+                          </div>
+                          <ul className="space-y-2">
+                            {mistakes.map(m => (
+                              <li key={m.id} className="bg-red-50 p-2 rounded border border-red-100">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <div className="font-semibold text-sm text-red-900">
+                                      {m.category && m.category !== 'Genel' && <span className="block text-[10px] text-red-600 opacity-80 uppercase tracking-wider">{m.category}</span>}
+                                      {m.topic}
+                                    </div>
+                                    <div className="text-xs text-red-500">{m.reason}</div>
+                                  </div>
+                                  <button onClick={() => removeMistake(m.id)} className="text-red-300 hover:text-red-500 print:hidden"><Trash2 size={14}/></button>
+                                </div>
+                                <button onClick={() => moveMistakeToRevision(m)} className="mt-2 w-full flex items-center justify-center gap-1 text-[10px] bg-white border border-red-200 text-red-600 py-1 rounded hover:bg-red-600 hover:text-white transition-colors print:hidden font-bold"><ArrowRightCircle size={12} /> Tekrar Listesine Ekle</button>
+                              </li>
+                            ))}
+                          </ul>
+                        </Card>
+
+                        <Card className="border-l-4 border-l-green-500">
+                          <SectionTitle icon={Repeat} title="Tekrar Listesi" color="text-green-700" />
+                          <div className="flex gap-2 mb-3 print:hidden">
+                            <input className="flex-1 bg-slate-50 text-sm border border-slate-200 rounded p-2 outline-none focus:border-green-400" placeholder="Tekrar edilecek konu..." value={revisionInput} onChange={e => setRevisionInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addRevision()} />
+                            <button onClick={addRevision} className="bg-green-600 text-white p-2 rounded hover:bg-green-700 transition-colors"><Plus size={18}/></button>
+                          </div>
+                          <ul className="space-y-2">
+                            {revisions.map(r => (
+                              <li key={r.id} className="flex justify-between items-center group">
+                                <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div><span className="text-sm">{r.text}</span></div>
+                                <button onClick={() => removeRevision(r.id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 print:hidden transition-opacity"><Trash2 size={14}/></button>
+                              </li>
+                            ))}
+                          </ul>
+                        </Card>
+                      </div>
+
+                      <div className="lg:col-span-8">
+                        <Card className="h-full border-t-4 border-t-indigo-900">
+                          <SectionTitle icon={Calendar} title="Günlük Akış" color="text-indigo-900" />
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-2">
+                            {days.map(day => (
+                              <div key={day} className={`border rounded-xl p-3 transition-colors ${day === 'Pazar' ? 'bg-orange-50/50 border-orange-200 md:col-span-2 print:col-span-2' : 'bg-slate-50/50 border-slate-200 hover:border-indigo-300'}`}>
+                                <div className="flex justify-between items-center mb-2">
+                                  <h4 className={`font-bold ${day === 'Pazar' ? 'text-orange-800' : 'text-slate-700'}`}>{day} {day === 'Pazar' && <span className="text-[10px] bg-orange-200 px-2 rounded-full text-orange-900 ml-2 font-bold">TELAFİ & GENEL TEKRAR</span>}</h4>
+                                </div>
+                                <div className="space-y-1 min-h-[60px]">
+                                  {(dailyPlan[day] || []).map(task => (
+                                    <div key={task.id} className="flex items-start gap-2 group text-sm">
+                                      <button onClick={() => toggleDailyTask(day, task.id)} className={`mt-1 w-4 h-4 border rounded flex items-center justify-center flex-shrink-0 transition-colors ${task.done ? 'bg-indigo-500 border-indigo-500 text-white' : 'bg-white border-slate-300'}`}>{task.done && <CheckSquare size={10} />}</button>
+                                      <span className={`flex-1 break-words ${task.done ? 'line-through text-slate-400' : 'text-slate-800'}`}>{task.text}</span>
+                                      <button onClick={() => removeDailyTask(day, task.id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 print:hidden flex-shrink-0 transition-opacity"><Trash2 size={12} /></button>
+                                    </div>
+                                  ))}
+                                </div>
+                                {activeTaskDay === day ? (
+                                  <div className="mt-2 bg-indigo-50/50 p-3 rounded-lg border border-indigo-200 shadow-sm print:hidden animate-in">
+                                     <select className="w-full text-xs bg-white border border-slate-200 rounded p-1.5 mb-2 outline-none focus:border-indigo-400 font-bold text-slate-700"
+                                         value={taskCat} onChange={e => { setTaskCat(e.target.value); setTaskTopic(''); }}>
+                                        {categories.map(c => <option key={c}>{c}</option>)}
+                                     </select>
+                                     
+                                     <div className="flex flex-col sm:flex-row gap-2 mb-2">
+                                         <select 
+                                           className="w-full sm:w-1/2 text-xs bg-white border border-slate-200 rounded p-1.5 outline-none focus:border-indigo-400"
+                                           value=""
+                                           onChange={e => { if(e.target.value) setTaskTopic(e.target.value); }}
+                                         >
+                                           <option value="">Listeden Seç...</option>
+                                           {subjects.filter(s => s.category === taskCat).map(s => (
+                                               <option key={s.id} value={s.name}>{s.name}</option>
+                                           ))}
+                                         </select>
+                                         <input className="w-full sm:w-1/2 text-xs bg-white border border-slate-200 rounded p-1.5 outline-none focus:border-indigo-400"
+                                             placeholder="veya elle yaz..."
+                                             value={taskTopic} onChange={e => setTaskTopic(e.target.value)}
+                                         />
+                                     </div>
+
+                                     <input className="w-full text-xs bg-white border border-slate-200 rounded p-1.5 mb-3 outline-none focus:border-indigo-400"
+                                         placeholder="Not (örn: 50 soru çözülecek)"
+                                         value={taskDesc} onChange={e => setTaskDesc(e.target.value)}
+                                         onKeyDown={e => e.key === 'Enter' && submitDailyTask(day)}
+                                     />
+                                     <div className="flex gap-2">
+                                        <button onClick={() => submitDailyTask(day)} className="flex-1 bg-indigo-600 text-white text-[10px] font-bold py-2 rounded hover:bg-indigo-700 transition-colors shadow-sm">GÖREV EKLE</button>
+                                        <button onClick={() => setActiveTaskDay(null)} className="flex-1 bg-white border border-slate-200 text-slate-600 text-[10px] font-bold py-2 rounded hover:bg-slate-50 transition-colors shadow-sm">İPTAL</button>
+                                     </div>
+                                  </div>
+                                ) : (
+                                  <button onClick={() => { setActiveTaskDay(day); setTaskTopic(''); setTaskDesc(''); }} className="mt-2 w-full flex items-center justify-center gap-1 bg-white border border-slate-200 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-indigo-600 hover:border-indigo-200 transition-colors print:hidden shadow-sm">
+                                     <Plus size={14} /> Yeni Görev Ekle
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </Card>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 2: KONU TAKİP */}
+                  {activeTab === 'subjects' && (
+                    <div className="space-y-6 animate-in">
+                      <Card className="border-l-4 border-l-blue-500">
+                        <SectionTitle icon={MapIcon} title="Konu Takip Çizelgesi" color="text-blue-700" 
+                          rightElement={
+                            <div className="flex items-center gap-3">
+                              <button onClick={resetSubjectsToDefault} className="text-xs font-bold flex items-center gap-1 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors print:hidden shadow-sm">
+                                <RefreshCw size={12} /> Varsayılanları Yükle
+                              </button>
+                              <div className="text-xs text-slate-500 italic print:hidden hidden sm:block">
+                                <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span>Bitti
+                                <span className="inline-block w-2 h-2 rounded-full bg-yellow-400 mx-1"></span>Çalışılıyor
+                                <span className="inline-block w-2 h-2 rounded-full bg-red-500 mx-1"></span>Tekrar
+                              </div>
+                            </div>
+                          }
+                        />
+                        <div className="flex flex-col sm:flex-row gap-2 mb-6 print:hidden">
+                          <select className="bg-slate-50 text-sm border border-slate-200 rounded-lg p-2 outline-none font-bold" value={newSubjectCat} onChange={e => setNewSubjectCat(e.target.value)}>
+                            {[...new Set([...Object.keys(yksKonulari), ...subjects.map(s => s.category)])].map(cat => (
+                              <option key={cat}>{cat}</option>
+                            ))}
+                          </select>
+                          <input className="flex-1 bg-slate-50 text-sm border border-slate-200 rounded-lg p-2 outline-none focus:border-blue-400" placeholder="Listeye kendi konunu ekle (Örn: Türev Özel Kurallar)" value={newSubject} onChange={e => setNewSubject(e.target.value)} onKeyDown={e => e.key === 'Enter' && addSubject()} />
+                          <button onClick={addSubject} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap">Konu Ekle</button>
+                        </div>
+                        
+                        {/* YENİ: TYT/AYT/YDT Filtreleme ve İlerleme Çubuğu */}
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6 print:hidden">
+                          <div className="flex bg-slate-100 p-1 rounded-xl w-full lg:w-max border border-slate-200 shadow-inner">
+                            <button onClick={() => setSubjectTypeFilter('TYT')} className={`flex-1 md:w-32 px-4 py-2 text-sm font-bold rounded-lg transition-colors ${subjectTypeFilter === 'TYT' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>TYT</button>
+                            <button onClick={() => setSubjectTypeFilter('AYT')} className={`flex-1 md:w-32 px-4 py-2 text-sm font-bold rounded-lg transition-colors ${subjectTypeFilter === 'AYT' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>AYT</button>
+                            <button onClick={() => setSubjectTypeFilter('YDT')} className={`flex-1 md:w-32 px-4 py-2 text-sm font-bold rounded-lg transition-colors ${subjectTypeFilter === 'YDT' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>YDT</button>
+                          </div>
+                          
+                          {(() => {
+                            const filteredSubjects = subjects.filter(s => s.category.startsWith(subjectTypeFilter));
+                            const totalFiltered = filteredSubjects.length;
+                            const doneFiltered = filteredSubjects.filter(s => s.status === 'done').length;
+                            const progressPercent = totalFiltered === 0 ? 0 : Math.round((doneFiltered / totalFiltered) * 100);
+                            
+                            return (
+                              <div className="flex-1 w-full lg:max-w-md bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-sm">
+                                <div className="flex justify-between items-center mb-1.5 text-xs font-bold text-slate-600">
+                                  <span>{subjectTypeFilter} Konu İlerlemesi</span>
+                                  <span className="text-blue-700">{doneFiltered} / {totalFiltered} (%{progressPercent})</span>
+                                </div>
+                                <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                                  <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-700" style={{ width: `${progressPercent}%` }}></div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {[...new Set([...Object.keys(yksKonulari), ...subjects.map(s => s.category)])]
+                            .filter(cat => cat.startsWith(subjectTypeFilter))
+                            .map(category => {
+                              const categorySubjects = subjects.filter(s => s.category === category);
+                              if (categorySubjects.length === 0) return null;
+                              return (
+                                <div key={category} className="border border-slate-200 rounded-xl overflow-hidden flex flex-col max-h-[400px] shadow-sm">
+                                  <div className="bg-slate-100 p-3 font-bold text-sm text-slate-700 border-b border-slate-200 sticky top-0 z-10">{category}</div>
+                                  <div className="p-2 space-y-2 overflow-y-auto flex-1 bg-white">
+                                    {categorySubjects.map(s => (
+                                      <div key={s.id} className={`flex items-center justify-between p-2.5 rounded-lg border text-sm transition-colors ${getStatusColor(s.status)}`}>
+                                        <span className="font-medium">{s.name}</span>
+                                        <div className="flex items-center gap-1.5 print:hidden">
+                                          <button title="Başlanmadı" onClick={() => updateSubjectStatus(s.id, 'pending')} className={`w-3.5 h-3.5 rounded-full border transition-colors flex-shrink-0 ${s.status === 'pending' ? 'bg-slate-400 border-slate-500' : 'bg-white border-slate-300 hover:bg-slate-200'}`}></button>
+                                          <button title="Çalışılıyor" onClick={() => updateSubjectStatus(s.id, 'working')} className={`w-3.5 h-3.5 rounded-full border transition-colors flex-shrink-0 ${s.status === 'working' ? 'bg-yellow-400 border-yellow-500' : 'bg-white border-slate-300 hover:bg-yellow-100'}`}></button>
+                                          <button title="Bitti" onClick={() => updateSubjectStatus(s.id, 'done')} className={`w-3.5 h-3.5 rounded-full border transition-colors flex-shrink-0 ${s.status === 'done' ? 'bg-green-500 border-green-600' : 'bg-white border-slate-300 hover:bg-green-100'}`}></button>
+                                          <button title="Tekrar Lazım" onClick={() => updateSubjectStatus(s.id, 'review')} className={`w-3.5 h-3.5 rounded-full border transition-colors flex-shrink-0 ${s.status === 'review' ? 'bg-red-500 border-red-600' : 'bg-white border-slate-300 hover:bg-red-100'}`}></button>
+                                          <button onClick={() => removeSubject(s.id)} className="ml-2 text-slate-300 hover:text-red-500 flex-shrink-0 transition-colors"><Trash2 size={14}/></button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                          })}
+                        </div>
+                      </Card>
+                    </div>
+                  )}
+
+                  {/* TAB 3: KAYNAK PLANLAMASI */}
+                  {activeTab === 'resources' && (
+                    <div className="space-y-6 animate-in">
+                      <Card className="border-l-4 border-l-purple-500">
+                        <SectionTitle icon={BookOpen} title="Kaynak Planlaması (Esas Kitaplar)" color="text-purple-700" 
+                          rightElement={<span className="text-xs text-slate-500 italic hidden sm:block">Hangi kitabı ne zaman bitireceksin? Stratejik ol.</span>} 
+                        />
+                        
+                        <div className="flex flex-col md:flex-row gap-3 mb-6 print:hidden bg-slate-50 p-4 rounded-xl border border-slate-100">
+                          <input className="flex-1 text-sm border border-slate-200 rounded-lg p-2.5 outline-none focus:border-purple-400" placeholder="Kitap Adı (Örn: 345 AYT Mat)" value={resInput.name} onChange={e => setResInput({...resInput, name: e.target.value})} />
+                          <div className="flex gap-3">
+                            <select className="flex-1 text-sm border border-slate-200 rounded-lg p-2.5 outline-none font-medium text-slate-700" value={resInput.subject} onChange={e => setResInput({...resInput, subject: e.target.value})}>
+                              <option>Matematik</option><option>Geometri</option><option>Fizik</option><option>Kimya</option><option>Biyoloji</option><option>Türkçe</option><option>Sosyal</option>
+                            </select>
+                            <select className="flex-1 text-sm border border-slate-200 rounded-lg p-2.5 outline-none font-medium text-slate-700" value={resInput.month} onChange={e => setResInput({...resInput, month: e.target.value})}>
+                              <option value="">Hedef Ay Seç</option>
+                              <option>Eylül</option><option>Ekim</option><option>Kasım</option><option>Aralık</option><option>Ocak</option><option>Şubat</option><option>Mart</option><option>Nisan</option><option>Mayıs</option>
+                            </select>
+                            <button onClick={addResource} className="bg-purple-600 text-white px-6 py-2.5 rounded-lg hover:bg-purple-700 font-bold text-sm shadow-sm transition-colors">EKLE</button>
+                          </div>
+                        </div>
+
+                        <div className="overflow-x-auto rounded-lg border border-slate-200">
+                          <table className="w-full text-sm text-left">
+                            <thead className="text-xs text-slate-500 uppercase bg-slate-100 border-b border-slate-200">
+                              <tr>
+                                <th className="p-4 font-bold">Ders</th>
+                                <th className="p-4 font-bold">Kitap Adı</th>
+                                <th className="p-4 font-bold">Hedef Ay</th>
+                                <th className="p-4 font-bold">Durum</th>
+                                <th className="p-4 text-right font-bold">İşlem</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white">
+                              {resources.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-slate-400 italic">Henüz bir kitap planlamadın. "Şubat'ta Apotemi bitecek" gibi hedefler koy.</td></tr>}
+                              {resources.map(r => (
+                                <tr key={r.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
+                                  <td className="p-4 font-bold text-slate-700">{r.subject}</td>
+                                  <td className="p-4">{r.name}</td>
+                                  <td className="p-4"><span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs font-bold">{r.month || '-'}</span></td>
+                                  <td className="p-4">
+                                    <select 
+                                      className={`text-xs font-bold border rounded-lg p-1.5 outline-none ${r.status === 'finished' ? 'bg-green-100 text-green-700 border-green-200' : r.status === 'in-progress' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}
+                                      value={r.status}
+                                      onChange={e => updateResourceStatus(r.id, e.target.value)}
+                                    >
+                                      <option value="not-started">Başlanmadı</option>
+                                      <option value="in-progress">Çözülüyor</option>
+                                      <option value="finished">Bitti</option>
+                                    </select>
+                                  </td>
+                                  <td className="p-4 text-right"><button onClick={() => deleteResource(r.id)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={18}/></button></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </Card>
+                    </div>
+                  )}
+
+                  {/* TAB 4: NET TAKİBİ & GELİŞİM */}
+                  {activeTab === 'progress' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in">
+                      <Card className="border-l-4 border-l-indigo-500 flex flex-col h-[500px]">
+                        <SectionTitle icon={TrendingUp} title="Net Takibi (Zoom Out)" color="text-indigo-700" />
+                        
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-4 print:hidden shrink-0 shadow-inner">
+                           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+                              <div className="flex gap-2">
+                                 <select className="text-sm border border-slate-200 rounded-lg p-2 outline-none font-bold text-indigo-900 bg-white" value={netInput.type} onChange={e => setNetInput({...netInput, type: e.target.value})}>
+                                   <option>TYT</option><option>AYT</option>
+                                 </select>
+                                 <input type="date" className="text-sm border border-slate-200 rounded-lg p-2 outline-none bg-white font-medium text-slate-600" value={netInput.date} onChange={e => setNetInput({...netInput, date: e.target.value})} />
+                              </div>
+                              <div className="flex bg-white rounded-lg border border-slate-200 p-1 self-start sm:self-auto shadow-sm">
+                                 <button onClick={() => setNetEntryMode('overall')} className={`text-xs px-3 py-1.5 rounded-md transition-colors font-medium ${netEntryMode === 'overall' ? 'bg-indigo-100 text-indigo-700 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}>Toplam</button>
+                                 <button onClick={() => setNetEntryMode('detailed')} className={`text-xs px-3 py-1.5 rounded-md transition-colors font-medium ${netEntryMode === 'detailed' ? 'bg-indigo-100 text-indigo-700 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}>Ders Detaylı</button>
+                              </div>
+                           </div>
+
+                           {netEntryMode === 'overall' ? (
+                              <div className="flex gap-2">
+                                 <input type="number" step="0.25" className="flex-1 text-sm border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-400 font-bold" placeholder={`${netInput.type} Toplam Net (Örn: 75.5)`} value={netInput.score} onChange={e => setNetInput({...netInput, score: e.target.value})} />
+                                 <button onClick={addNetScore} className="bg-indigo-600 text-white px-6 rounded-lg hover:bg-indigo-700 font-bold flex items-center gap-2 transition-colors shadow-sm"><Plus size={18}/> Ekle</button>
+                              </div>
+                           ) : (
+                              <div className="space-y-3">
+                                 {netInput.type === 'TYT' ? (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                       <input type="number" step="0.25" placeholder="Türkçe" className="text-sm border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-400" value={detailedNetInput.tyt.turkce} onChange={e => setDetailedNetInput({...detailedNetInput, tyt: {...detailedNetInput.tyt, turkce: e.target.value}})} />
+                                       <input type="number" step="0.25" placeholder="Matematik" className="text-sm border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-400" value={detailedNetInput.tyt.mat} onChange={e => setDetailedNetInput({...detailedNetInput, tyt: {...detailedNetInput.tyt, mat: e.target.value}})} />
+                                       <input type="number" step="0.25" placeholder="Sosyal" className="text-sm border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-400" value={detailedNetInput.tyt.sosyal} onChange={e => setDetailedNetInput({...detailedNetInput, tyt: {...detailedNetInput.tyt, sosyal: e.target.value}})} />
+                                       <input type="number" step="0.25" placeholder="Fen" className="text-sm border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-400" value={detailedNetInput.tyt.fen} onChange={e => setDetailedNetInput({...detailedNetInput, tyt: {...detailedNetInput.tyt, fen: e.target.value}})} />
+                                    </div>
+                                 ) : (
+                                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                                       <input type="number" step="0.25" placeholder="Matematik" className="text-sm border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-400" value={detailedNetInput.ayt.mat} onChange={e => setDetailedNetInput({...detailedNetInput, ayt: {...detailedNetInput.ayt, mat: e.target.value}})} />
+                                       <input type="number" step="0.25" placeholder="Edebiyat" className="text-sm border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-400" value={detailedNetInput.ayt.edebiyat} onChange={e => setDetailedNetInput({...detailedNetInput, ayt: {...detailedNetInput.ayt, edebiyat: e.target.value}})} />
+                                       <input type="number" step="0.25" placeholder="Sosyal 1" className="text-sm border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-400" value={detailedNetInput.ayt.sos1} onChange={e => setDetailedNetInput({...detailedNetInput, ayt: {...detailedNetInput.ayt, sos1: e.target.value}})} />
+                                       <input type="number" step="0.25" placeholder="Sosyal 2" className="text-sm border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-400" value={detailedNetInput.ayt.sos2} onChange={e => setDetailedNetInput({...detailedNetInput, ayt: {...detailedNetInput.ayt, sos2: e.target.value}})} />
+                                       <input type="number" step="0.25" placeholder="Fen" className="text-sm border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-400" value={detailedNetInput.ayt.fen} onChange={e => setDetailedNetInput({...detailedNetInput, ayt: {...detailedNetInput.ayt, fen: e.target.value}})} />
+                                    </div>
+                                 )}
+                                 <button onClick={addNetScore} className="w-full bg-indigo-600 text-white py-2.5 rounded-lg hover:bg-indigo-700 text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"><Plus size={18}/> Detaylı Neti Kaydet</button>
+                              </div>
+                           )}
+                        </div>
+                        
+                        <div className="space-y-2 overflow-y-auto flex-1 pr-2 custom-scrollbar">
+                          {netScores.length === 0 && <div className="text-center text-slate-400 text-sm italic p-8">Henüz deneme verisi girmediniz.</div>}
+                          {netScores.map(n => (
+                            <div key={n.id} className="flex flex-col p-4 bg-white border border-slate-100 rounded-xl shadow-sm hover:shadow-md transition-shadow group">
+                               <div className="flex justify-between items-center">
+                                  <div className="flex items-center">
+                                     <span className={`text-xs font-black px-3 py-1 rounded-lg mr-3 shadow-sm ${n.type === 'TYT' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>{n.type}</span>
+                                     <span className="font-mono font-bold text-xl text-slate-800">{n.score} <span className="text-xs text-slate-400 font-sans font-normal">NET</span></span>
+                                  </div>
+                                  <div className="flex items-center gap-4">
+                                     <span className="text-sm font-medium text-slate-400">{n.date.split('-').reverse().join('.')}</span>
+                                     <button onClick={() => deleteNetScore(n.id)} className="text-slate-300 hover:text-red-500 print:hidden opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={18}/></button>
+                                  </div>
+                               </div>
+                               
+                               {n.isDetailed && n.details && (
+                                  <div className="flex gap-x-4 gap-y-2 text-[11px] text-slate-600 mt-3 pt-3 border-t border-slate-100 flex-wrap">
+                                     {n.type === 'TYT' ? (
+                                        <>
+                                           {n.details.turkce !== 0 && <span><b className="text-slate-800 font-bold">TR:</b> {n.details.turkce}</span>}
+                                           {n.details.mat !== 0 && <span><b className="text-slate-800 font-bold">MAT:</b> {n.details.mat}</span>}
+                                           {n.details.sosyal !== 0 && <span><b className="text-slate-800 font-bold">SOS:</b> {n.details.sosyal}</span>}
+                                           {n.details.fen !== 0 && <span><b className="text-slate-800 font-bold">FEN:</b> {n.details.fen}</span>}
+                                        </>
+                                     ) : (
+                                        <>
+                                           {n.details.mat !== 0 && <span><b className="text-slate-800 font-bold">MAT:</b> {n.details.mat}</span>}
+                                           {n.details.edebiyat !== 0 && <span><b className="text-slate-800 font-bold">EDB:</b> {n.details.edebiyat}</span>}
+                                           {n.details.sos1 !== 0 && <span><b className="text-slate-800 font-bold">SOS1:</b> {n.details.sos1}</span>}
+                                           {n.details.sos2 !== 0 && <span><b className="text-slate-800 font-bold">SOS2:</b> {n.details.sos2}</span>}
+                                           {n.details.fen !== 0 && <span><b className="text-slate-800 font-bold">FEN:</b> {n.details.fen}</span>}
+                                        </>
+                                     )}
+                                  </div>
+                               )}
+                            </div>
+                          ))}
+                        </div>
+                      </Card>
+
+                      <div className="space-y-6">
+                        <Card className="bg-slate-800 text-white border-none flex flex-col h-[320px] shadow-lg">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 opacity-90 flex-shrink-0 gap-3">
+                            <div className="flex items-center gap-2"><TrendingUp size={20} /> <h3 className="font-bold text-lg">Gelişim Grafiği</h3></div>
+                            <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap justify-end">
+                              <div className="flex bg-slate-900 rounded-lg border border-slate-700 p-1 shadow-inner">
+                                 <button onClick={() => setChartType('bar')} className={`text-xs px-3 py-1.5 rounded-md transition-colors font-bold ${chartType === 'bar' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}>Sütun</button>
+                                 <button onClick={() => setChartType('line')} className={`text-xs px-3 py-1.5 rounded-md transition-colors font-bold ${chartType === 'line' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}>Çizgi</button>
+                              </div>
+                              <button 
+                                onClick={() => setShowAllNets(!showAllNets)} 
+                                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors shadow-sm ${showAllNets ? 'bg-indigo-500 hover:bg-indigo-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-200'}`}
+                              >
+                                {showAllNets ? 'Son 5 Deneme' : 'Tümünü Gör'}
+                              </button>
+                            </div>
+                          </div>
+                          
+                          {/* GRAFİK ALANI */}
+                          {chartType === 'bar' ? (
+                              <div className={`flex-1 flex items-end gap-3 p-3 bg-slate-900/60 rounded-xl relative overflow-hidden ${showAllNets ? 'overflow-x-auto justify-start custom-scrollbar' : 'justify-between'}`}>
+                                {chartData.map((n, i) => {
+                                  const maxScore = n.type === 'TYT' ? 120 : 80; 
+                                  return (
+                                    <div key={n.id} className={`flex flex-col items-center gap-1 h-full group relative ${showAllNets ? 'min-w-[48px]' : 'flex-1'}`}>
+                                      <div className="text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5 text-indigo-300 z-10">{n.score}</div>
+                                      <div className="w-full flex-1 flex flex-col-reverse justify-start relative rounded-t-md overflow-hidden bg-slate-800/80 border-x border-t border-slate-700 group-hover:bg-slate-700 transition-colors">
+                                         {!n.isDetailed ? (
+                                            <div 
+                                              className={`w-full transition-all duration-500 ${n.type === 'TYT' ? 'bg-gradient-to-t from-blue-600 to-blue-400' : 'bg-gradient-to-t from-red-600 to-red-400'}`} 
+                                              style={{ height: `${Math.min(100, Math.max(0, (n.score / maxScore) * 100))}%` }} 
+                                              title={`${n.type} Toplam: ${n.score}`}
+                                            ></div>
+                                         ) : (
+                                            n.type === 'TYT' ? (
+                                               <>
+                                                  {n.details.fen > 0 && <div title={`Fen: ${n.details.fen}`} className="w-full bg-green-500" style={{ height: `${(n.details.fen / maxScore) * 100}%` }}></div>}
+                                                  {n.details.sosyal > 0 && <div title={`Sosyal: ${n.details.sosyal}`} className="w-full bg-orange-500" style={{ height: `${(n.details.sosyal / maxScore) * 100}%` }}></div>}
+                                                  {n.details.mat > 0 && <div title={`Matematik: ${n.details.mat}`} className="w-full bg-blue-500" style={{ height: `${(n.details.mat / maxScore) * 100}%` }}></div>}
+                                                  {n.details.turkce > 0 && <div title={`Türkçe: ${n.details.turkce}`} className="w-full bg-red-500" style={{ height: `${(n.details.turkce / maxScore) * 100}%` }}></div>}
+                                               </>
+                                            ) : (
+                                               <>
+                                                  {n.details.fen > 0 && <div title={`Fen: ${n.details.fen}`} className="w-full bg-green-500" style={{ height: `${(n.details.fen / maxScore) * 100}%` }}></div>}
+                                                  {n.details.sos2 > 0 && <div title={`Sosyal 2: ${n.details.sos2}`} className="w-full bg-orange-600" style={{ height: `${(n.details.sos2 / maxScore) * 100}%` }}></div>}
+                                                  {n.details.sos1 > 0 && <div title={`Sosyal 1: ${n.details.sos1}`} className="w-full bg-yellow-500" style={{ height: `${(n.details.sos1 / maxScore) * 100}%` }}></div>}
+                                                  {n.details.edebiyat > 0 && <div title={`Edebiyat: ${n.details.edebiyat}`} className="w-full bg-purple-500" style={{ height: `${(n.details.edebiyat / maxScore) * 100}%` }}></div>}
+                                                  {n.details.mat > 0 && <div title={`Matematik: ${n.details.mat}`} className="w-full bg-blue-600" style={{ height: `${(n.details.mat / maxScore) * 100}%` }}></div>}
+                                               </>
+                                            )
+                                         )}
+                                      </div>
+                                      <div className="text-[9px] font-medium text-slate-400 mt-1 whitespace-nowrap">{n.date.slice(5).replace('-', '.')}</div>
+                                    </div>
+                                  )
+                                })}
+                                {netScores.length === 0 && <div className="w-full h-full flex items-center justify-center text-slate-500 text-sm italic">Grafik için deneme verisi girin.</div>}
+                              </div>
+                          ) : (
+                              <div className={`flex-1 p-3 bg-slate-900/60 rounded-xl relative overflow-hidden ${showAllNets ? 'overflow-x-auto custom-scrollbar' : ''}`}>
+                                 <div className="relative w-full h-full min-h-[150px]" style={{ minWidth: showAllNets && chartData.length > 6 ? `${chartData.length * 60}px` : '100%' }}>
+                                    <svg className="absolute inset-0 w-full h-full overflow-visible pointer-events-none">
+                                        {chartData.map((n, i) => {
+                                            if (i === 0) return null;
+                                            const prev = chartData[i-1];
+                                            const prevMax = prev.type === 'TYT' ? 120 : 80;
+                                            const currMax = n.type === 'TYT' ? 120 : 80;
+                                            
+                                            const prevX = chartData.length > 1 ? ((i - 1) / (chartData.length - 1)) * 100 : 50;
+                                            const prevY = 10 + ((100 - (prev.score / prevMax) * 100) * 0.8);
+                                            
+                                            const currX = chartData.length > 1 ? (i / (chartData.length - 1)) * 100 : 50;
+                                            const currY = 10 + ((100 - (n.score / currMax) * 100) * 0.8);
+
+                                            const padX = (val) => 5 + (val * 0.9);
+
+                                            return (
+                                                <line 
+                                                    key={`line-${i}`}
+                                                    x1={`${padX(prevX)}%`} y1={`${prevY}%`}
+                                                    x2={`${padX(currX)}%`} y2={`${currY}%`}
+                                                    stroke="#475569" strokeWidth="2"
+                                                    strokeDasharray="4 4"
+                                                />
+                                            );
+                                        })}
+                                    </svg>
+                                    
+                                    {chartData.map((n, i) => {
+                                        const maxScore = n.type === 'TYT' ? 120 : 80;
+                                        const x = chartData.length > 1 ? (i / (chartData.length - 1)) * 100 : 50;
+                                        const y = 10 + ((100 - (n.score / maxScore) * 100) * 0.8);
+                                        const padX = 5 + (x * 0.9);
+
+                                        return (
+                                            <div 
+                                                key={`dot-${n.id}`} 
+                                                className={`absolute w-3.5 h-3.5 border-2 border-slate-900 rounded-full transform -translate-x-1/2 -translate-y-1/2 group cursor-pointer z-10 transition-transform hover:scale-150 ${n.type === 'TYT' ? 'bg-blue-500' : 'bg-red-500'}`}
+                                                style={{ left: `${padX}%`, top: `${y}%` }}
+                                            >
+                                               <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 bg-white text-slate-900 text-[10px] font-bold px-2 py-1 rounded shadow-lg opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity pointer-events-none z-20">
+                                                  {n.type}: {n.score}
+                                                  {n.isDetailed && (
+                                                      <div className="text-[8px] text-slate-500 font-normal mt-0.5 border-t border-slate-200 pt-0.5">
+                                                          Detaylar için sütun moduna geç.
+                                                      </div>
+                                                  )}
+                                               </div>
+                                               <div className="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 text-[9px] font-medium text-slate-400 whitespace-nowrap pointer-events-none">
+                                                  {n.date.slice(5).replace('-', '.')}
+                                               </div>
+                                            </div>
+                                        );
+                                    })}
+                                    {chartData.length === 0 && <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm italic">Grafik için deneme verisi girin.</div>}
+                                 </div>
+                              </div>
+                          )}
+                          
+                          {/* Grafik Altı Renk Lejantı */}
+                          {chartType === 'bar' && (() => {
+                            const hasDetailedTyt = chartData.some(n => n.type === 'TYT' && n.isDetailed);
+                            const hasDetailedAyt = chartData.some(n => n.type === 'AYT' && n.isDetailed);
+                            if (!hasDetailedTyt && !hasDetailedAyt) return null;
+                            
+                            return (
+                              <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-[9px] font-bold mt-4 pt-3 border-t border-slate-700/50 text-slate-300">
+                                 {hasDetailedTyt && (
+                                    <>
+                                      <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-red-500 rounded-sm"></span> TR</div>
+                                      <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-blue-500 rounded-sm"></span> TYT MAT</div>
+                                      <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-orange-500 rounded-sm"></span> TYT SOS</div>
+                                      <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-green-500 rounded-sm"></span> TYT FEN</div>
+                                    </>
+                                 )}
+                                 {hasDetailedAyt && (
+                                    <>
+                                      <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-blue-600 rounded-sm"></span> AYT MAT</div>
+                                      <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-purple-500 rounded-sm"></span> EDB</div>
+                                      <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-yellow-500 rounded-sm"></span> SOS1</div>
+                                      <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-orange-600 rounded-sm"></span> SOS2</div>
+                                      <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-green-500 rounded-sm"></span> AYT FEN</div>
+                                    </>
+                                 )}
+                              </div>
+                            )
+                          })()}
+                          {chartType === 'line' && chartData.length > 0 && (
+                              <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-[9px] font-bold mt-4 pt-3 border-t border-slate-700/50 text-slate-300">
+                                 <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-blue-500 rounded-full"></span> TYT Puanları</div>
+                                 <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-red-500 rounded-full"></span> AYT Puanları</div>
+                              </div>
+                          )}
+                        </Card>
+
+                        <Card className="border-l-4 border-l-orange-500 h-[155px]">
+                          <SectionTitle icon={Clock} title="Haftalık Tempo" color="text-orange-700" rightElement={<span className="text-[10px] bg-orange-100 text-orange-700 px-2 py-1 rounded font-bold">LİNEER ARTIŞ</span>} />
+                          <div className="flex items-end justify-between gap-2 h-16 mt-2">
+                            {studyHours.map((s, i) => (
+                              <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative h-full justify-end">
+                                <div className="w-full bg-orange-200 rounded-t-md group-hover:bg-orange-300 transition-colors relative" style={{ height: `${Math.max(10, Math.min(100, (s.hours / 12) * 100))}%` }}>
+                                  <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-black text-orange-700 opacity-0 group-hover:opacity-100 transition-opacity bg-orange-50 px-1 rounded shadow-sm">{s.hours}s</span>
+                                </div>
+                                <span className="text-[9px] text-slate-400 font-bold">{s.date.slice(5).replace('-', '.')}</span>
+                              </div>
+                            ))}
+                            {studyHours.length === 0 && <div className="text-sm text-slate-400 italic w-full text-center mt-4">Çalışma saati verisi yok.</div>}
+                          </div>
+                        </Card>
+                      </div>
+
+                    </div>
+                  )}
+
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
