@@ -12,20 +12,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <style>
-        @media print {
-            .print\:hidden { display: none !important; }
-            .print\:bg-white { background-color: white !important; }
-            .print\:text-black { color: black !important; }
-            .print\:p-0 { padding: 0 !important; }
-            .print\:shadow-none { box-shadow: none !important; }
-            .print\:rounded-none { border-radius: 0 !important; }
-        }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .animate-in { animation: fadeIn 0.3s ease-in-out; }
     </style>
 </head>
 <body class="bg-slate-50">
@@ -33,57 +22,11 @@
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
-
         const SUPABASE_URL = 'https://mksvpawdyyrtabittrzx.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_VY32lTPPgeo0pHthJmAtKw_cs1-lwCn';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const Icon = ({ name, size = 24, className = "" }) => {
-            const svgRef = React.useRef();
-            useEffect(() => {
-                if (svgRef.current) {
-                    lucide.createIcons({
-                        icons: { [name]: lucide.icons[name] },
-                        nameAttr: 'data-lucide',
-                        attrs: {
-                            class: `lucide lucide-${name} ${className}`,
-                            width: size,
-                            height: size,
-                            stroke: 'currentColor',
-                            'stroke-width': 2,
-                            'stroke-linecap': 'round',
-                            'stroke-linejoin': 'round'
-                        }
-                    });
-                }
-            }, [name, size, className]);
-            return <span ref={svgRef} className={`inline-flex items-center justify-center ${className}`} />;
-        };
-
-        const Plus = (props) => <Icon name="Plus" {...props} />;
-        const Trash2 = (props) => <Icon name="Trash2" {...props} />;
-        const Printer = (props) => <Icon name="Printer" {...props} />;
-        const RotateCcw = (props) => <Icon name="RotateCcw" {...props} />;
-        const CheckSquare = (props) => <Icon name="CheckSquare" {...props} />;
-        const User = (props) => <Icon name="User" {...props} />;
-        const Users = (props) => <Icon name="Users" {...props} />;
-        const ChevronLeft = (props) => <Icon name="ChevronLeft" {...props} />;
-        const Download = (props) => <Icon name="Download" {...props} />;
-        const Upload = (props) => <Icon name="Upload" {...props} />;
-        const LogOut = (props) => <Icon name="LogOut" {...props} />;
-        const ArrowRightCircle = (props) => <Icon name="ArrowRightCircle" {...props} />;
-        const Flag = (props) => <Icon name="Flag" {...props} />;
-        const BookOpen = (props) => <Icon name="BookOpen" {...props} />;
-        const TrendingUp = (props) => <Icon name="TrendingUp" {...props} />;
-        const Clock = (props) => <Icon name="Clock" {...props} />;
-        const MapIcon = (props) => <Icon name="Map" {...props} />;
-        const BarChart2 = (props) => <Icon name="BarChart2" {...props} />;
-        const Play = (props) => <Icon name="Play" {...props} />;
-        const Pause = (props) => <Icon name="Pause" {...props} />;
-        const RefreshCw = (props) => <Icon name="RefreshCw" {...props} />;
-        const Calendar = (props) => <Icon name="Calendar" {...props} />;
-        const AlertTriangle = (props) => <Icon name="AlertTriangle" {...props} />;
-
+        // --- Auth Ekranı ve Butonlar dahil tüm yapı ---
         function AuthScreen() {
           const [isLogin, setIsLogin] = useState(true);
           const [email, setEmail] = useState('');
@@ -95,7 +38,6 @@
             e.preventDefault();
             setLoading(true);
             setError(null);
-            
             try {
               if (isLogin) {
                 const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -107,7 +49,7 @@
                 setIsLogin(true);
               }
             } catch (err) {
-              setError(err.message === "Invalid login credentials" ? "E-posta veya şifre hatalı." : err.message);
+              setError(err.message);
             } finally {
               setLoading(false);
             }
@@ -115,55 +57,50 @@
 
           const handleGoogleSignIn = async () => {
             setLoading(true);
-            const { error } = await supabase.auth.signInWithOAuth({
-              provider: 'google',
-            });
+            const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
             if (error) setError(error.message);
             setLoading(false);
           };
 
           return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
-              <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100 animate-in">
-                <div className="flex justify-center mb-6">
-                  <div className="bg-indigo-600 p-4 rounded-full shadow-lg shadow-indigo-200 text-white">
-                    <User size={32} />
-                  </div>
-                </div>
-                <h2 className="text-2xl font-bold text-center text-slate-800 mb-2">
-                  {isLogin ? 'Panele Giriş Yap' : 'Yeni PDR Hesabı'}
-                </h2>
-
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+              <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100">
+                <h2 className="text-2xl font-bold text-center mb-6">{isLogin ? 'Panele Giriş' : 'Kayıt Ol'}</h2>
                 <form onSubmit={handleAuth} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">E-posta</label>
-                    <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 outline-none focus:border-indigo-500 transition-colors" placeholder="ornek@mail.com" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Şifre</label>
-                    <input type="password" required value={password} onChange={e => setPassword(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 outline-none focus:border-indigo-500 transition-colors" placeholder="••••••••" />
-                  </div>
+                  <input type="email" placeholder="E-posta" className="w-full border rounded-lg px-4 py-3" value={email} onChange={e => setEmail(e.target.value)} />
+                  <input type="password" placeholder="Şifre" className="w-full border rounded-lg px-4 py-3" value={password} onChange={e => setPassword(e.target.value)} />
+                  {error && <p className="text-red-500 text-sm">{error}</p>}
+                  <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold">{isLogin ? 'Giriş Yap' : 'Kayıt Ol'}</button>
                   
-                  {error && <div className="text-red-500 text-sm font-medium bg-red-50 p-3 rounded-lg border border-red-100">{error}</div>}
-
-                  <button type="submit" disabled={loading}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-md transition-colors disabled:opacity-50">
-                    {loading ? 'İşleniyor...' : (isLogin ? 'Giriş Yap' : 'Kayıt Ol')}
-                  </button>
-
-                  <div className="relative my-4">
-                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200"></div></div>
-                    <div className="relative flex justify-center text-sm"><span className="bg-white px-2 text-slate-500">veya</span></div>
-                  </div>
-
-                  <button type="button" onClick={handleGoogleSignIn} disabled={loading}
-                    className="w-full bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-3 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-3">
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+                  <div className="text-center text-sm text-slate-400">veya</div>
+                  
+                  <button type="button" onClick={handleGoogleSignIn} className="w-full bg-white border border-slate-300 py-3 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-slate-50">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" />
                     Google ile Giriş Yap
                   </button>
                 </form>
+                <button onClick={() => setIsLogin(!isLogin)} className="w-full mt-4 text-indigo-600 text-sm font-bold">
+                  {isLogin ? 'Hesabın yok mu? Kayıt ol' : 'Giriş yap'}
+                </button>
+              </div>
+            </div>
+          );
+        }
 
-                <div className="mt-6 text-center">
-                  <button onClick={() => {setIsLogin(!isLogin); setError(null);}} className="text-indigo-600 text-sm font-bold hover:text-indigo-800 transition-colors
+        // Ana App bileşeni ve mantığı buraya gelecek
+        function App() {
+          const [session, setSession] = useState(null);
+          useEffect(() => {
+            supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+            supabase.auth.onAuthStateChange((_event, session) => setSession(session));
+          }, []);
+
+          if (!session) return <AuthScreen />;
+          return <div className="p-10 text-center text-2xl font-bold">Panele Hoşgeldiniz!</div>;
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
