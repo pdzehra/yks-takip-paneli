@@ -13,6 +13,8 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Supabase JS İstemcisi -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <style>
         /* Print ve Custom Scrollbar Stilleri */
@@ -38,9 +40,14 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
 
-        // SVG İkon Bileşenleri (Lucide-React alternatifi)
+        // SUPABASE BAĞLANTISI
+        const SUPABASE_URL = 'https://mksvpawdyyrtabittrzx.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_VY32lTPPgeo0pHthJmAtKw_cs1-lwCn';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // SVG İkon Bileşenleri
         const Icon = ({ name, size = 24, className = "" }) => {
             const svgRef = React.useRef();
             useEffect(() => {
@@ -98,6 +105,8 @@
         const ChevronLeft = (props) => <Icon name="ChevronLeft" {...props} />;
         const Download = (props) => <Icon name="Download" {...props} />;
         const Upload = (props) => <Icon name="Upload" {...props} />;
+        const LogOut = (props) => <Icon name="LogOut" {...props} />;
+        const User = (props) => <Icon name="User" {...props} />;
 
         // --- BİLEŞENLER ---
         const Card = ({ children, className = "" }) => (
@@ -165,55 +174,182 @@
         });
 
         // ==========================================
+        // GİRİŞ / KAYIT EKRANI BİLEŞENİ
+        // ==========================================
+        function AuthScreen() {
+          const [isLogin, setIsLogin] = useState(true);
+          const [email, setEmail] = useState('');
+          const [password, setPassword] = useState('');
+          const [error, setError] = useState(null);
+          const [loading, setLoading] = useState(false);
+
+          const handleAuth = async (e) => {
+            e.preventDefault();
+            setLoading(true);
+            setError(null);
+            
+            try {
+              if (isLogin) {
+                const { error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+              } else {
+                const { error } = await supabase.auth.signUp({ email, password });
+                if (error) throw error;
+                alert("Kayıt başarılı! Lütfen giriş yapın.");
+                setIsLogin(true);
+              }
+            } catch (err) {
+              setError(err.message === "Invalid login credentials" ? "E-posta veya şifre hatalı." : err.message);
+            } finally {
+              setLoading(false);
+            }
+          };
+
+          return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
+              <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100 animate-in">
+                <div className="flex justify-center mb-6">
+                  <div className="bg-indigo-600 p-4 rounded-full shadow-lg shadow-indigo-200 text-white">
+                    <User size={32} />
+                  </div>
+                </div>
+                <h2 className="text-2xl font-bold text-center text-slate-800 mb-2">
+                  {isLogin ? 'Panele Giriş Yap' : 'Yeni PDR Hesabı'}
+                </h2>
+                <p className="text-center text-slate-500 mb-6 text-sm">
+                  {isLogin ? 'Öğrencilerinizi takip etmek için giriş yapın.' : 'Uzman hesabınızı oluşturun.'}
+                </p>
+
+                <form onSubmit={handleAuth} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">E-posta</label>
+                    <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 outline-none focus:border-indigo-500 transition-colors" placeholder="ornek@mail.com" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Şifre</label>
+                    <input type="password" required value={password} onChange={e => setPassword(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 outline-none focus:border-indigo-500 transition-colors" placeholder="••••••••" />
+                  </div>
+                  
+                  {error && <div className="text-red-500 text-sm font-medium bg-red-50 p-3 rounded-lg border border-red-100">{error}</div>}
+
+                  <button type="submit" disabled={loading}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-md transition-colors disabled:opacity-50">
+                    {loading ? 'İşleniyor...' : (isLogin ? 'Giriş Yap' : 'Kayıt Ol')}
+                  </button>
+                </form>
+
+                <div className="mt-6 text-center">
+                  <button onClick={() => {setIsLogin(!isLogin); setError(null);}} className="text-indigo-600 text-sm font-bold hover:text-indigo-800 transition-colors">
+                    {isLogin ? 'Hesabınız yok mu? Kayıt Olun' : 'Zaten hesabınız var mı? Giriş Yapın'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        // ==========================================
         // ANA BİLEŞEN (EĞİTMEN PANELİ YÖNETİMİ)
         // ==========================================
         function App() {
-          // VERİ KAYBI SORUNU BURADA ÇÖZÜLDÜ: Lazy Initialization
-          const [students, setStudents] = useState(() => {
-            const savedCoachData = localStorage.getItem('yks_panel_v1');
-            if (savedCoachData) {
-              return JSON.parse(savedCoachData);
-            }
-            // Eski anahtar kontrolü (Geriye dönük uyumluluk)
-            const oldKey = 'rehberlik_coach_v1';
-            const oldData = localStorage.getItem(oldKey);
-            if (oldData) {
-              return JSON.parse(oldData);
-            }
-            return [];
-          });
-          
+          const [session, setSession] = useState(null);
+          const [students, setStudents] = useState([]);
           const [activeStudentId, setActiveStudentId] = useState(null);
+          const [isDataLoading, setIsDataLoading] = useState(true);
+          const debounceRef = useRef(null);
 
-          // Her değişiklikte doğrudan kaydet
+          // Oturum ve Veri Çekme
           useEffect(() => {
-            localStorage.setItem('yks_panel_v1', JSON.stringify(students));
-          }, [students]);
+            supabase.auth.getSession().then(({ data: { session } }) => {
+              setSession(session);
+              if (session) fetchStudents(session.user.id);
+              else setIsDataLoading(false);
+            });
 
-          const handleUpdateStudent = (updatedStudent) => {
-            setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s));
+            const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+              setSession(session);
+              if (session) fetchStudents(session.user.id);
+              else setStudents([]);
+            });
+
+            return () => subscription.unsubscribe();
+          }, []);
+
+          const fetchStudents = async (userId) => {
+            setIsDataLoading(true);
+            const { data, error } = await supabase.from('students').select('*').order('created_at', { ascending: false });
+            if (!error && data) {
+              setStudents(data.map(row => row.panel_data));
+            }
+            setIsDataLoading(false);
           };
 
-          const handleAddStudent = (name) => {
+          const handleLogout = async () => {
+            await supabase.auth.signOut();
+          };
+
+          // Supabase'e fazla istek atmamak için arka planda sessizce (1 saniye gecikmeli) kaydeder
+          const handleUpdateStudent = (updatedStudent) => {
+            setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s));
+            
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            debounceRef.current = setTimeout(async () => {
+              const { error } = await supabase.from('students')
+                .update({ panel_data: updatedStudent, name: updatedStudent.name })
+                .eq('student_id', updatedStudent.id);
+              if(error) console.error("Güncelleme hatası", error);
+            }, 1000);
+          };
+
+          const handleAddStudent = async (name) => {
             if (!name.trim()) return;
             const newStudent = getNewStudentData(name);
             setStudents([...students, newStudent]);
+
+            const { error } = await supabase.from('students').insert({
+              user_id: session.user.id,
+              student_id: newStudent.id,
+              name: newStudent.name,
+              panel_data: newStudent
+            });
+            if(error) console.error("Ekleme hatası", error);
           };
 
-          const handleDeleteStudent = (id) => {
+          const handleDeleteStudent = async (id) => {
             if (window.confirm("Bu öğrencinin tüm verileri silinecek. Emin misiniz?")) {
               setStudents(prev => prev.filter(s => s.id !== id));
+              const { error } = await supabase.from('students').delete().eq('student_id', id);
+              if(error) console.error("Silme hatası", error);
             }
           };
 
-          const handleImportData = (importedData) => {
+          const handleImportData = async (importedData) => {
             if (window.confirm("Mevcut verileriniz tamamen silinip yerine yüklediğiniz dosyadaki veriler getirilecek. Emin misiniz?")) {
               setStudents(importedData);
+              // Önce buluttaki eskileri sil
+              await supabase.from('students').delete().eq('user_id', session.user.id);
+              // Yenileri ekle
+              const inserts = importedData.map(s => ({
+                  user_id: session.user.id,
+                  student_id: s.id,
+                  name: s.name,
+                  panel_data: s
+              }));
+              await supabase.from('students').insert(inserts);
               alert("Veriler başarıyla yüklendi!");
             }
           };
 
-          // AKTİF ÖĞRENCİ GÖRÜNÜMÜ
+          if (!session) return <AuthScreen />;
+          
+          if (isDataLoading) return (
+             <div className="min-h-screen flex flex-col items-center justify-center font-bold text-indigo-500 bg-slate-50 gap-4">
+               <RefreshCw className="animate-spin" size={32} /> Verileriniz buluttan getiriliyor...
+             </div>
+          );
+
           if (activeStudentId) {
             const activeStudent = students.find(s => s.id === activeStudentId);
             if (!activeStudent) {
@@ -230,22 +366,22 @@
             );
           }
 
-          // KOÇLUK PANELİ (DASHBOARD) GÖRÜNÜMÜ
           return <CoachDashboard 
                    students={students} 
                    onAdd={handleAddStudent} 
                    onDelete={handleDeleteStudent} 
                    onSelect={setActiveStudentId} 
                    onImport={handleImportData}
+                   onLogout={handleLogout}
                  />;
         }
 
         // ==========================================
         // BİLEŞEN 1: KOÇLUK EKRANI (DASHBOARD)
         // ==========================================
-        function CoachDashboard({ students, onAdd, onDelete, onSelect, onImport }) {
+        function CoachDashboard({ students, onAdd, onDelete, onSelect, onImport, onLogout }) {
           const [newName, setNewName] = useState('');
-          const fileInputRef = React.useRef(null);
+          const fileInputRef = useRef(null);
 
           const handleExport = () => {
             const dataStr = JSON.stringify(students);
@@ -264,21 +400,18 @@
             reader.onload = (event) => {
               try {
                 const parsed = JSON.parse(event.target.result);
-                if (Array.isArray(parsed)) {
-                  onImport(parsed);
-                } else {
-                  alert("Geçersiz yedek dosyası!");
-                }
+                if (Array.isArray(parsed)) onImport(parsed);
+                else alert("Geçersiz yedek dosyası!");
               } catch (err) {
                 alert("Dosya okuma hatası! Lütfen geçerli bir yedek dosyası seçin.");
               }
             };
             reader.readAsText(file);
-            e.target.value = ''; // Input'u temizle
+            e.target.value = ''; 
           };
 
           return (
-            <div className="min-h-screen bg-slate-50 p-6 md:p-12 font-sans text-slate-800">
+            <div className="min-h-screen bg-slate-50 p-6 md:p-12 font-sans text-slate-800 animate-in">
               <div className="max-w-7xl mx-auto">
                 
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
@@ -292,14 +425,17 @@
                     </div>
                   </div>
                   
-                  {/* YEDEKLEME BUTONLARI */}
-                  <div className="flex gap-2 w-full md:w-auto">
+                  {/* YEDEKLEME VE ÇIKIŞ BUTONLARI */}
+                  <div className="flex gap-2 w-full md:w-auto flex-wrap">
                     <input type="file" accept=".json" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
                     <button onClick={() => fileInputRef.current.click()} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-lg font-bold hover:bg-slate-50 transition-colors shadow-sm text-sm">
                       <Upload size={16} /> Yedeği Yükle
                     </button>
                     <button onClick={handleExport} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-700 px-4 py-2 rounded-lg font-bold hover:bg-indigo-100 transition-colors shadow-sm text-sm">
                       <Download size={16} /> Yedekle (İndir)
+                    </button>
+                    <button onClick={onLogout} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-100 transition-colors shadow-sm text-sm">
+                      <LogOut size={16} /> Çıkış Yap
                     </button>
                   </div>
                 </div>
@@ -414,14 +550,13 @@
                     </div>
                   </div>
                 )}
-
               </div>
             </div>
           );
         }
 
         // ==========================================
-        // BİLEŞEN 2: ÖĞRENCİ DETAYI
+        // BİLEŞEN 2: ÖĞRENCİ DETAYI (KODUNUZUN BİREBİR AYNISI)
         // ==========================================
         function StudentDetail({ student, onUpdate, onBack }) {
           const [activeTab, setActiveTab] = useState('weekly'); 
