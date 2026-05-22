@@ -23,8 +23,10 @@
             .print\:bg-white { background-color: white !important; }
             .print\:text-black { color: black !important; }
             .print\:p-0 { padding: 0 !important; }
+            .print\:m-0 { margin: 0 !important; }
             .print\:shadow-none { box-shadow: none !important; }
             .print\:rounded-none { border-radius: 0 !important; }
+            .print\:border-none { border: none !important; }
         }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -107,6 +109,8 @@
         const Upload = (props) => <Icon name="Upload" {...props} />;
         const LogOut = (props) => <Icon name="LogOut" {...props} />;
         const User = (props) => <Icon name="User" {...props} />;
+        const Archive = (props) => <Icon name="Archive" {...props} />;
+        const ArchiveRestore = (props) => <Icon name="ArchiveRestore" {...props} />;
 
         // --- BİLEŞENLER ---
         const Card = ({ children, className = "" }) => (
@@ -160,6 +164,7 @@
         const getNewStudentData = (name) => ({
           id: Date.now().toString(),
           name: name,
+          status: 'active', // Yeni öğrencilerin hepsi aktif
           week: '',
           macroGoals: { tytDate: '', aytDate: '' },
           subjects: defaultSubjectsList,
@@ -373,10 +378,18 @@
           };
 
           const handleDeleteStudent = async (id) => {
-            if (window.confirm("Bu öğrencinin tüm verileri silinecek. Emin misiniz?")) {
+            if (window.confirm("Bu öğrencinin tüm verileri kalıcı olarak silinecek. Emin misiniz?")) {
               setStudents(prev => prev.filter(s => s.id !== id));
               const { error } = await supabase.from('students').delete().eq('student_id', id);
               if(error) console.error("Silme hatası", error);
+            }
+          };
+
+          // YENİ: Arşivleme / Arşivden Çıkarma
+          const handleToggleArchive = (id, archive) => {
+            const student = students.find(s => s.id === id);
+            if (student) {
+              handleUpdateStudent({ ...student, status: archive ? 'archived' : 'active' });
             }
           };
 
@@ -424,7 +437,8 @@
           return <CoachDashboard 
                    students={students} 
                    onAdd={handleAddStudent} 
-                   onDelete={handleDeleteStudent} 
+                   onDelete={handleDeleteStudent}
+                   onToggleArchive={handleToggleArchive} 
                    onSelect={setActiveStudentId} 
                    onImport={handleImportData}
                    onLogout={handleLogout}
@@ -434,9 +448,14 @@
         // ==========================================
         // BİLEŞEN 1: KOÇLUK EKRANI (DASHBOARD)
         // ==========================================
-        function CoachDashboard({ students, onAdd, onDelete, onSelect, onImport, onLogout }) {
+        function CoachDashboard({ students, onAdd, onDelete, onToggleArchive, onSelect, onImport, onLogout }) {
           const [newName, setNewName] = useState('');
+          const [showArchived, setShowArchived] = useState(false); // YENİ: Arşiv görünümü durumu
           const fileInputRef = useRef(null);
+
+          const activeStudents = students.filter(s => s.status !== 'archived');
+          const archivedStudents = students.filter(s => s.status === 'archived');
+          const displayedStudents = showArchived ? archivedStudents : activeStudents;
 
           const handleExport = () => {
             const dataStr = JSON.stringify(students);
@@ -469,7 +488,7 @@
             <div className="min-h-screen bg-slate-50 p-6 md:p-12 font-sans text-slate-800 animate-in">
               <div className="max-w-7xl mx-auto">
                 
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 print:hidden">
                   <div className="flex items-center gap-3">
                     <div className="bg-indigo-600 p-3 rounded-xl shadow-lg shadow-indigo-200 text-white">
                       <Users size={32} />
@@ -496,7 +515,7 @@
                 </div>
 
                 {/* Öğrenci Ekleme Formu */}
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex gap-3 mb-8">
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex gap-3 mb-6 print:hidden">
                   <input 
                     value={newName} 
                     onChange={(e) => setNewName(e.target.value)}
@@ -512,71 +531,95 @@
                   </button>
                 </div>
 
+                {/* Aktif / Arşiv Sekmeleri */}
+                <div className="flex gap-6 mb-6 border-b border-slate-200 print:hidden">
+                    <button onClick={() => setShowArchived(false)} className={`pb-3 px-2 font-bold text-sm transition-colors ${!showArchived ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                        Aktif Öğrenciler ({activeStudents.length})
+                    </button>
+                    <button onClick={() => setShowArchived(true)} className={`pb-3 px-2 font-bold text-sm transition-colors ${showArchived ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                        Arşivlenenler ({archivedStudents.length})
+                    </button>
+                </div>
+
                 {/* Öğrenci Listesi Grid */}
-                {students.length === 0 ? (
-                  <div className="text-center py-20 bg-white rounded-xl border border-slate-200 border-dashed">
-                    <Users size={48} className="mx-auto text-slate-300 mb-4" />
-                    <h3 className="text-xl font-bold text-slate-600 mb-2">Henüz Öğrenci Yok</h3>
-                    <p className="text-slate-500">Yukarıdaki alanı kullanarak takip edeceğiniz öğrencileri ekleyebilirsiniz.</p>
+                {displayedStudents.length === 0 ? (
+                  <div className="text-center py-20 bg-white rounded-xl border border-slate-200 border-dashed print:hidden">
+                    {showArchived ? (
+                        <>
+                            <Archive size={48} className="mx-auto text-slate-300 mb-4" />
+                            <h3 className="text-xl font-bold text-slate-600 mb-2">Arşiv Boş</h3>
+                            <p className="text-slate-500">Henüz arşivlenmiş bir öğrenciniz bulunmuyor.</p>
+                        </>
+                    ) : (
+                        <>
+                            <Users size={48} className="mx-auto text-slate-300 mb-4" />
+                            <h3 className="text-xl font-bold text-slate-600 mb-2">Henüz Öğrenci Yok</h3>
+                            <p className="text-slate-500">Yukarıdaki alanı kullanarak takip edeceğiniz öğrencileri ekleyebilirsiniz.</p>
+                        </>
+                    )}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {students.map(student => {
+                  <div className="flex flex-col gap-3 print:hidden">
+                    {displayedStudents.map(student => {
                       // Özet Veri Hesaplamaları
                       const lastTyt = student.netScores.filter(n => n.type === 'TYT').slice(-1)[0]?.score || '-';
                       const lastAyt = student.netScores.filter(n => n.type === 'AYT').slice(-1)[0]?.score || '-';
                       const finishedSubjects = student.subjects.filter(s => s.status === 'done').length;
                       
                       return (
-                        <div key={student.id} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 hover:shadow-md transition-shadow relative group">
-                          <div className="flex justify-between items-start mb-4">
-                            <h3 className="text-xl font-bold text-slate-800">{student.name}</h3>
-                            <button 
-                              onClick={() => onDelete(student.id)} 
-                              className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                              title="Öğrenciyi Sil"
-                            >
-                              <Trash2 size={18} />
-                            </button>
+                        <div key={student.id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:shadow-md transition-shadow group">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">{student.name}</h3>
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-4 mb-6">
-                            <div className="bg-blue-50 p-3 rounded-xl border border-blue-100">
-                              <div className="text-xs font-bold text-blue-500 mb-1">SON TYT</div>
-                              <div className="text-2xl font-black text-blue-700">{lastTyt}</div>
+                          <div className="flex items-center gap-4 flex-wrap text-sm">
+                            <div className="flex items-center gap-1.5 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100">
+                              <span className="text-[10px] font-bold text-blue-500">TYT</span>
+                              <span className="font-bold text-blue-700">{lastTyt}</span>
                             </div>
-                            <div className="bg-red-50 p-3 rounded-xl border border-red-100">
-                              <div className="text-xs font-bold text-red-500 mb-1">SON AYT</div>
-                              <div className="text-2xl font-black text-red-700">{lastAyt}</div>
+                            <div className="flex items-center gap-1.5 bg-red-50 px-3 py-1.5 rounded-lg border border-red-100">
+                              <span className="text-[10px] font-bold text-red-500">AYT</span>
+                              <span className="font-bold text-red-700">{lastAyt}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                              <CheckSquare size={14} className="text-green-500" />
+                              <span><strong>{finishedSubjects}</strong> Konu</span>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-                            <CheckSquare size={16} className="text-green-500" />
-                            <span>Toplam <strong>{finishedSubjects}</strong> konu bitirildi.</span>
+                          <div className="flex items-center gap-2 w-full md:w-auto justify-end mt-2 md:mt-0">
+                            <button onClick={() => onSelect(student.id)} className="flex-1 md:flex-none bg-slate-900 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold flex items-center justify-center gap-2 transition-colors text-xs shadow-sm">
+                              Profili Aç <ArrowRightCircle size={14} />
+                            </button>
+                            <div className="flex gap-1">
+                                {!showArchived ? (
+                                    <button onClick={() => onToggleArchive(student.id, true)} className="p-2 text-slate-400 hover:text-amber-500 bg-slate-50 hover:bg-amber-50 rounded-lg transition-colors border border-transparent hover:border-amber-200" title="Arşivle"><Archive size={16} /></button>
+                                ) : (
+                                    <button onClick={() => onToggleArchive(student.id, false)} className="p-2 text-slate-400 hover:text-green-500 bg-slate-50 hover:bg-green-50 rounded-lg transition-colors border border-transparent hover:border-green-200" title="Arşivden Çıkar"><ArchiveRestore size={16} /></button>
+                                )}
+                                <button onClick={() => onDelete(student.id)} className="p-2 text-slate-400 hover:text-red-500 bg-slate-50 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-200" title="Kalıcı Olarak Sil"><Trash2 size={16} /></button>
+                            </div>
                           </div>
-
-                          <button 
-                            onClick={() => onSelect(student.id)} 
-                            className="w-full bg-slate-900 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"
-                          >
-                            Öğrenci Profilini Aç <ArrowRightCircle size={18} />
-                          </button>
                         </div>
                       );
                     })}
                   </div>
                 )}
 
-                {/* Öğrenci Karşılaştırma Tablosu */}
-                {students.length > 0 && (
-                  <div className="mt-12 bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                    <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                      <BarChart2 size={24} className="text-indigo-600" /> Öğrenci Karşılaştırma Tablosu
-                    </h3>
+                {/* Öğrenci Karşılaştırma Tablosu (Sadece Aktif Öğrenciler İçin) */}
+                {activeStudents.length > 0 && (
+                  <div className="mt-12 bg-white rounded-2xl p-6 shadow-sm border border-slate-200 print:mt-0 print:border-none print:shadow-none print:p-0">
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <BarChart2 size={24} className="text-indigo-600 print:hidden" /> Aktif Öğrenci Karşılaştırma Tablosu
+                      </h3>
+                      <button onClick={() => window.print()} className="print:hidden flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-bold transition-colors text-sm">
+                        <Printer size={16} /> Tabloyu Yazdır
+                      </button>
+                    </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm text-left">
-                        <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+                        <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200 print:bg-white print:border-b-2 print:border-slate-800">
                           <tr>
                             <th className="px-6 py-4 font-bold">Öğrenci</th>
                             <th className="px-6 py-4 font-bold">Son TYT</th>
@@ -585,18 +628,18 @@
                             <th className="px-6 py-4 font-bold">Günlük Soru Hedefi</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {students.map(s => {
+                        <tbody className="divide-y divide-slate-100 print:divide-slate-300">
+                          {activeStudents.map(s => {
                             const lastTyt = s.netScores.filter(n => n.type === 'TYT').slice(-1)[0]?.score || '-';
                             const lastAyt = s.netScores.filter(n => n.type === 'AYT').slice(-1)[0]?.score || '-';
                             const finishedSubjects = s.subjects.filter(sub => sub.status === 'done').length;
                             return (
-                              <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                                <td className="px-6 py-4 font-bold text-slate-700">{s.name}</td>
-                                <td className="px-6 py-4"><span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-md font-bold">{lastTyt}</span></td>
-                                <td className="px-6 py-4"><span className="bg-red-100 text-red-700 px-2 py-1 rounded-md font-bold">{lastAyt}</span></td>
-                                <td className="px-6 py-4 text-green-600 font-medium">{finishedSubjects} Konu</td>
-                                <td className="px-6 py-4 text-indigo-600 font-medium">{s.dailyQuestionCount} Soru</td>
+                              <tr key={s.id} className="hover:bg-slate-50 transition-colors print:hover:bg-white">
+                                <td className="px-6 py-4 font-bold text-slate-700 print:text-black">{s.name}</td>
+                                <td className="px-6 py-4"><span className="bg-blue-100 text-blue-700 print:bg-transparent print:text-black print:p-0 px-2 py-1 rounded-md font-bold">{lastTyt}</span></td>
+                                <td className="px-6 py-4"><span className="bg-red-100 text-red-700 print:bg-transparent print:text-black print:p-0 px-2 py-1 rounded-md font-bold">{lastAyt}</span></td>
+                                <td className="px-6 py-4 text-green-600 print:text-black font-medium">{finishedSubjects} Konu</td>
+                                <td className="px-6 py-4 text-indigo-600 print:text-black font-medium">{s.dailyQuestionCount} Soru</td>
                               </tr>
                             )
                           })}
@@ -649,9 +692,9 @@
           const [taskDesc, setTaskDesc] = useState('');
           
           const [showAllNets, setShowAllNets] = useState(false); 
-          const [chartType, setChartType] = useState('bar'); // 'bar' | 'line'
+          const [chartType, setChartType] = useState('bar'); 
 
-          const [subjectTypeFilter, setSubjectTypeFilter] = useState('TYT'); // YENİ: TYT/AYT/YDT filtresi
+          const [subjectTypeFilter, setSubjectTypeFilter] = useState('TYT'); 
           
           const [pomodoroTime, setPomodoroTime] = useState(25 * 60);
           const [isTimerActive, setIsTimerActive] = useState(false);
@@ -661,7 +704,7 @@
           useEffect(() => {
             onUpdate({
               id: student.id,
-              name, week, mistakes, revisions, dailyPlan, dailyQuestionCount, todayStudyHour, macroGoals, subjects, resources, netScores, studyHours
+              name, week, mistakes, revisions, dailyPlan, dailyQuestionCount, todayStudyHour, macroGoals, subjects, resources, netScores, studyHours, status: student.status || 'active'
             });
           }, [name, week, mistakes, revisions, dailyPlan, dailyQuestionCount, todayStudyHour, macroGoals, subjects, resources, netScores, studyHours]);
 
@@ -891,36 +934,44 @@
                   {activeTab === 'weekly' && (
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in">
                       <div className="lg:col-span-4 space-y-6">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className={`col-span-2 p-3 rounded-xl border ${timerMode === 'work' ? 'bg-indigo-50 border-indigo-200' : 'bg-green-50 border-green-200'} flex items-center justify-between`}>
-                            <div>
-                              <div className="text-xs font-bold opacity-70 mb-1">POMODORO</div>
-                              <div className="text-2xl font-mono font-bold">{formatTime(pomodoroTime)}</div>
+                        <div className="flex flex-col gap-3">
+                          <div className={`p-2.5 rounded-xl border ${timerMode === 'work' ? 'bg-indigo-50 border-indigo-200' : 'bg-green-50 border-green-200'} flex items-center justify-between shadow-sm`}>
+                            <div className="flex items-center gap-3">
+                              <div className="text-[10px] font-bold opacity-70 tracking-wider">POMODORO</div>
+                              <div className="text-xl font-mono font-bold">{formatTime(pomodoroTime)}</div>
                             </div>
-                            <div className="flex gap-1">
-                              <button onClick={toggleTimer} className="p-2 bg-white rounded-full shadow hover:bg-slate-50">{isTimerActive ? <Pause size={16}/> : <Play size={16}/>}</button>
-                              <button onClick={resetTimer} className="p-2 bg-white rounded-full shadow hover:bg-slate-50"><RefreshCw size={16}/></button>
-                              <button onClick={switchTimerMode} className="p-2 bg-white rounded-full shadow text-[10px] font-bold hover:bg-slate-50">{timerMode === 'work' ? 'Mola' : 'İş'}</button>
+                            <div className="flex gap-1.5">
+                              <button onClick={toggleTimer} className="p-1.5 bg-white rounded-md shadow-sm hover:bg-slate-50 transition-colors">{isTimerActive ? <Pause size={14}/> : <Play size={14}/>}</button>
+                              <button onClick={resetTimer} className="p-1.5 bg-white rounded-md shadow-sm hover:bg-slate-50 transition-colors"><RefreshCw size={14}/></button>
+                              <button onClick={switchTimerMode} className="px-2 py-1 bg-white rounded-md shadow-sm text-[10px] font-bold hover:bg-slate-50 transition-colors">{timerMode === 'work' ? 'Mola' : 'İş'}</button>
                             </div>
                           </div>
                           
-                          <div className="p-3 rounded-xl border border-slate-200 bg-white flex flex-col items-center justify-center">
-                            <div className="text-2xl font-bold text-indigo-900">{dailyQuestionCount}</div>
-                            <div className="text-[10px] text-slate-400 font-bold tracking-wider">GÜNLÜK SORU</div>
-                            <div className="flex gap-2 mt-1">
-                              <button onClick={() => setDailyQuestionCount(c => Math.max(0, c - 10))} className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center hover:bg-slate-200">-</button>
-                              <button onClick={() => setDailyQuestionCount(c => c + 10)} className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 hover:bg-indigo-200">+</button>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="p-2.5 rounded-xl border border-slate-200 bg-white flex items-center justify-between shadow-sm">
+                              <div>
+                                <div className="text-[9px] text-slate-400 font-bold tracking-wider mb-0.5">GÜNLÜK SORU</div>
+                                <div className="text-xl font-bold text-indigo-900 leading-none">{dailyQuestionCount}</div>
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <button onClick={() => setDailyQuestionCount(c => c + 10)} className="w-5 h-5 bg-indigo-50 rounded flex items-center justify-center text-indigo-700 hover:bg-indigo-100 transition-colors leading-none text-xs font-bold">+</button>
+                                <button onClick={() => setDailyQuestionCount(c => Math.max(0, c - 10))} className="w-5 h-5 bg-slate-50 rounded flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors leading-none text-xs font-bold">-</button>
+                              </div>
                             </div>
-                          </div>
 
-                          <div className="p-3 rounded-xl border border-slate-200 bg-white flex flex-col items-center justify-center">
-                            <div className="text-2xl font-bold text-indigo-900">{todayStudyHour} <span className="text-xs font-normal text-slate-400">sa</span></div>
-                            <div className="text-[10px] text-slate-400 font-bold tracking-wider">BUGÜN ÇALIŞMA</div>
-                            <div className="flex gap-2 mt-1">
-                              <button onClick={() => setTodayStudyHour(h => Math.max(0, h - 0.5))} className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center hover:bg-slate-200">-</button>
-                              <button onClick={() => setTodayStudyHour(h => h + 0.5)} className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 hover:bg-indigo-200">+</button>
+                            <div className="p-2.5 rounded-xl border border-slate-200 bg-white flex flex-col justify-between shadow-sm relative">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="text-[9px] text-slate-400 font-bold tracking-wider mb-0.5">BUGÜN ÇALIŞMA</div>
+                                  <div className="text-xl font-bold text-indigo-900 leading-none">{todayStudyHour} <span className="text-[10px] font-normal text-slate-400">sa</span></div>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  <button onClick={() => setTodayStudyHour(h => h + 0.5)} className="w-5 h-5 bg-indigo-50 rounded flex items-center justify-center text-indigo-700 hover:bg-indigo-100 transition-colors leading-none text-xs font-bold">+</button>
+                                  <button onClick={() => setTodayStudyHour(h => Math.max(0, h - 0.5))} className="w-5 h-5 bg-slate-50 rounded flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors leading-none text-xs font-bold">-</button>
+                                </div>
+                              </div>
+                              <button onClick={saveStudyHour} className="mt-2 text-[9px] bg-indigo-50 text-indigo-700 py-1 rounded hover:bg-indigo-100 w-full font-bold transition-colors">Grafiğe Kaydet</button>
                             </div>
-                            <button onClick={saveStudyHour} className="mt-2 text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-100 w-full font-bold">Grafiğe Kaydet</button>
                           </div>
                         </div>
 
@@ -1087,7 +1138,7 @@
                           <button onClick={addSubject} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap">Konu Ekle</button>
                         </div>
                         
-                        {/* YENİ: TYT/AYT/YDT Filtreleme ve İlerleme Çubuğu */}
+                        {/* TYT/AYT/YDT Filtreleme ve İlerleme Çubuğu */}
                         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6 print:hidden">
                           <div className="flex bg-slate-100 p-1 rounded-xl w-full lg:w-max border border-slate-200 shadow-inner">
                             <button onClick={() => setSubjectTypeFilter('TYT')} className={`flex-1 md:w-32 px-4 py-2 text-sm font-bold rounded-lg transition-colors ${subjectTypeFilter === 'TYT' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>TYT</button>
